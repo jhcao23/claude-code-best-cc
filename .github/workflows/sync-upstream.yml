@@ -1,0 +1,34 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # every 10 minutes
+  workflow_dispatch: # manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync all branches from upstream
+        run: |
+          git remote add upstream https://github.com/claude-code-best/claude-code.git
+          git fetch upstream
+
+          # Sync each upstream branch
+          for branch in $(git branch -r | grep 'upstream/' | grep -v 'HEAD' | sed 's|upstream/||'); do
+            echo "Syncing branch: $branch"
+            if git show-ref --verify --quiet "refs/heads/$branch"; then
+              # Branch exists locally — fast-forward only
+              git checkout "$branch"
+              git merge --ff-only "upstream/$branch" || echo "⚠️ $branch: can't fast-forward, skipping"
+            else
+              # New branch — create tracking branch
+              git checkout -b "$branch" "upstream/$branch"
+            fi
+            git push origin "$branch" || echo "⚠️ $branch: push failed, skipping"
+          done
