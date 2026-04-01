@@ -14,21 +14,22 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sync all branches from upstream
+      - name: Sync all branches and tags from upstream
         run: |
           git remote add upstream https://github.com/claude-code-best/claude-code.git
-          git fetch upstream
+          git fetch upstream --tags
 
-          # Sync each upstream branch
+          # Sync branches
           for branch in $(git branch -r | grep 'upstream/' | grep -v 'HEAD' | sed 's|upstream/||'); do
             echo "Syncing branch: $branch"
             if git show-ref --verify --quiet "refs/heads/$branch"; then
-              # Branch exists locally — fast-forward only
               git checkout "$branch"
               git merge --ff-only "upstream/$branch" || echo "⚠️ $branch: can't fast-forward, skipping"
             else
-              # New branch — create tracking branch
               git checkout -b "$branch" "upstream/$branch"
             fi
             git push origin "$branch" || echo "⚠️ $branch: push failed, skipping"
           done
+
+          # Sync tags
+          git push origin --tags
