@@ -32,8 +32,8 @@ import {
   ensureBackendsRegistered,
   getBackendByType,
 } from '../utils/swarm/backends/registry.js'
-import type { PaneBackendType } from '../utils/swarm/backends/types.js'
-import { TEAM_LEAD_NAME } from '../utils/swarm/constants.js'
+import type { PaneBackendType } from '@anthropic/swarm'
+import { TEAM_LEAD_NAME } from '@anthropic/swarm'
 import { getLeaderToolUseConfirmQueue } from '../utils/swarm/leaderPermissionBridge.js'
 import { sendPermissionResponseViaMailbox } from '../utils/swarm/permissionSync.js'
 import {

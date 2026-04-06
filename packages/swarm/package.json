@@ -1,13 +1,12 @@
 {
-  "name": "@anthropic/shell",
+  "name": "@anthropic/swarm",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
-    "execa": "^9.6.1",
-    "lodash-es": "^4.17.23",
-    "tree-kill": "^1.2.2"
+    "@anthropic/agent": "workspace:*",
+    "zod": "^4.3.6"
   }
 }

@@ -36,7 +36,7 @@ import {
   getBackendByType,
   getCachedBackend,
 } from '../../utils/swarm/backends/registry.js'
-import type { PaneBackendType } from '../../utils/swarm/backends/types.js'
+import type { PaneBackendType } from '@anthropic/swarm'
 import {
   getSwarmSocketName,
   TMUX_COMMAND,

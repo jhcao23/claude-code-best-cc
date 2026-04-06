@@ -88,17 +88,19 @@ import { claimTask, listTasks, type Task, updateTask } from '../tasks.js'
 import type { TeammateContext } from '../teammateContext.js'
 import { runWithTeammateContext } from '../teammateContext.js'
 import {
-  createIdleNotification,
   getLastPeerDmSummary,
-  isPermissionResponse,
-  isShutdownRequest,
   markMessageAsReadByIndex,
   readMailbox,
   writeToMailbox,
 } from '../teammateMailbox.js'
+import {
+  createIdleNotification as swarmCreateIdleNotification,
+  isShutdownRequest as swarmIsShutdownRequest,
+  isPermissionResponse as swarmIsPermissionResponse,
+} from '@anthropic/swarm'
 import { unregisterAgent as unregisterPerfettoAgent } from '../telemetry/perfettoTracing.js'
 import { createContentReplacementState } from '../toolResultStorage.js'
-import { TEAM_LEAD_NAME } from './constants.js'
+import { TEAM_LEAD_NAME } from '@anthropic/swarm'
 import {
   getLeaderSetToolPermissionContext,
   getLeaderToolUseConfirmQueue,
@@ -107,7 +109,7 @@ import {
   createPermissionRequest,
   sendPermissionRequestViaMailbox,
 } from './permissionSync.js'
-import { TEAMMATE_SYSTEM_PROMPT_ADDENDUM } from './teammatePromptAddendum.js'
+import { TEAMMATE_SYSTEM_PROMPT_ADDENDUM } from '@anthropic/swarm'
 
 type SetAppStateFn = (updater: (prev: AppState) => AppState) => void
 
@@ -398,7 +400,7 @@ function createInProcessCanUseTool(
           for (let i = 0; i < allMessages.length; i++) {
             const msg = allMessages[i]
             if (msg && !msg.read) {
-              const parsed = isPermissionResponse(msg.text)
+              const parsed = swarmIsPermissionResponse(msg.text)
               if (parsed && parsed.request_id === request.id) {
                 await markMessageAsReadByIndex(
                   identity.agentName,
@@ -578,11 +580,11 @@ async function sendIdleNotification(
     failureReason?: string
   },
 ): Promise<void> {
-  const notification = createIdleNotification(agentName, options)
+  const notification = swarmCreateIdleNotification(agentName, options)
 
   await sendMessageToLeader(
     agentName,
-    jsonStringify(notification),
+    notification, // swarmCreateIdleNotification already returns JSON string
     agentColor,
     teamName,
   )
@@ -662,7 +664,7 @@ async function tryClaimNextTask(
 type WaitResult =
   | {
       type: 'shutdown_request'
-      request: ReturnType<typeof isShutdownRequest>
+      request: ReturnType<typeof swarmIsShutdownRequest>
       originalMessage: string
     }
   | {
@@ -769,11 +771,11 @@ async function waitForNextPromptOrShutdown(
       // readMailbox() already reads all messages from disk, so this scan
       // adds only ~1-2ms of JSON parsing overhead.
       let shutdownIndex = -1
-      let shutdownParsed: ReturnType<typeof isShutdownRequest> = null
+      let shutdownParsed: ReturnType<typeof swarmIsShutdownRequest> = null
       for (let i = 0; i < allMessages.length; i++) {
         const m = allMessages[i]
         if (m && !m.read) {
-          const parsed = isShutdownRequest(m.text)
+          const parsed = swarmIsShutdownRequest(m.text)
           if (parsed) {
             shutdownIndex = i
             shutdownParsed = parsed

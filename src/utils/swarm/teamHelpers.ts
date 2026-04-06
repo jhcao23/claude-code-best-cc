@@ -13,8 +13,8 @@ import type { PermissionMode } from '../permissions/PermissionMode.js'
 import { jsonParse, jsonStringify } from '../slowOperations.js'
 import { getTasksDir, notifyTasksUpdated } from '../tasks.js'
 import { getAgentName, getTeamName, isTeammate } from '../teammate.js'
-import { type BackendType, isPaneBackend } from './backends/types.js'
-import { TEAM_LEAD_NAME } from './constants.js'
+import { type BackendType, isPaneBackend } from '@anthropic/swarm'
+import { TEAM_LEAD_NAME } from '@anthropic/swarm'
 
 export const inputSchema = lazySchema(() =>
   z.strictObject({

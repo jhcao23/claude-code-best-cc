@@ -18,6 +18,8 @@
         "@anthropic-ai/sdk": "^0.80.0",
         "@anthropic-ai/vertex-sdk": "^0.14.4",
         "@anthropic/agent": "workspace:*",
+        "@anthropic/config": "workspace:*",
+        "@anthropic/swarm": "workspace:*",
         "@aws-sdk/client-bedrock": "^3.1020.0",
         "@aws-sdk/client-bedrock-runtime": "^3.1020.0",
         "@aws-sdk/client-sts": "^3.1020.0",
@@ -154,6 +156,10 @@
         "highlight.js": "latest",
       },
     },
+    "packages/config": {
+      "name": "@anthropic/config",
+      "version": "0.1.0",
+    },
     "packages/image-processor-napi": {
       "name": "image-processor-napi",
       "version": "1.0.0",
@@ -168,6 +174,19 @@
     "packages/shell": {
       "name": "@anthropic/shell",
       "version": "0.1.0",
+      "dependencies": {
+        "execa": "^9.6.1",
+        "lodash-es": "^4.17.23",
+        "tree-kill": "^1.2.2",
+      },
+    },
+    "packages/swarm": {
+      "name": "@anthropic/swarm",
+      "version": "0.1.0",
+      "dependencies": {
+        "@anthropic/agent": "workspace:*",
+        "zod": "^4.3.6",
+      },
     },
     "packages/url-handler-napi": {
       "name": "url-handler-napi",
@@ -201,7 +220,11 @@
 
     "@anthropic/agent": ["@anthropic/agent@workspace:packages/agent"],
 
+    "@anthropic/config": ["@anthropic/config@workspace:packages/config"],
+
     "@anthropic/shell": ["@anthropic/shell@workspace:packages/shell"],
+
+    "@anthropic/swarm": ["@anthropic/swarm@workspace:packages/swarm"],
 
     "@aws-crypto/crc32": ["@aws-crypto/crc32@5.2.0", "https://registry.npmmirror.com/@aws-crypto/crc32/-/crc32-5.2.0.tgz", { "dependencies": { "@aws-crypto/util": "^5.2.0", "@aws-sdk/types": "^3.222.0", "tslib": "^2.6.2" } }, "sha512-nLbCWqQNgUiwwtFsen1AdzAtvuLRsQS8rYgMuxCrdKf9kOssamGLuPwyTY9wyYblNr9+1XM8v6zoDTPPSIeANg=="],
 

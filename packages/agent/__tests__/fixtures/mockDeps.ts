@@ -20,6 +20,7 @@ export function createMockDeps(overrides?: Partial<AgentDeps>): AgentDeps {
     },
     tools: {
       find: mock(() => undefined),
+      list: mock(() => []),
       execute: mock(async () => ({ output: 'mock tool result' })),
     },
     permission: {

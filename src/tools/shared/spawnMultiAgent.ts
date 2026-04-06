@@ -35,11 +35,10 @@ import {
   resetBackendDetection,
 } from '../../utils/swarm/backends/registry.js'
 import { getTeammateModeFromSnapshot } from '../../utils/swarm/backends/teammateModeSnapshot.js'
-import type { BackendType } from '../../utils/swarm/backends/types.js'
-import { isPaneBackend } from '../../utils/swarm/backends/types.js'
+import { isPaneBackend, type BackendType } from '@anthropic/swarm'
+import { TEAM_LEAD_NAME } from '@anthropic/swarm'
 import {
   SWARM_SESSION_NAME,
-  TEAM_LEAD_NAME,
   TEAMMATE_COMMAND_ENV_VAR,
   TMUX_COMMAND,
 } from '../../utils/swarm/constants.js'

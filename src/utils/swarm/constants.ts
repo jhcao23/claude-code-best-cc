@@ -1,4 +1,14 @@
-export const TEAM_LEAD_NAME = 'team-lead'
+// 常量已迁移到 @anthropic/swarm，这里重新导出以保持向后兼容
+export {
+  TEAM_LEAD_NAME,
+  MAILBOX_POLL_INTERVAL_MS,
+  PERMISSION_POLL_INTERVAL_MS,
+  TEAMMATE_MESSAGES_UI_CAP,
+  LOCK_OPTIONS,
+  ENV,
+} from '@anthropic/swarm'
+
+// src/ 端独有的常量（依赖 src/ 基础设施，不放入 packages/swarm）
 export const SWARM_SESSION_NAME = 'claude-swarm'
 export const SWARM_VIEW_WINDOW_NAME = 'swarm-view'
 export const TMUX_COMMAND = 'tmux'

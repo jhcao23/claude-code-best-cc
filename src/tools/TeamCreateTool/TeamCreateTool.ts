@@ -14,7 +14,7 @@ import {
 } from '../../utils/model/model.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import { getResolvedTeammateMode } from '../../utils/swarm/backends/registry.js'
-import { TEAM_LEAD_NAME } from '../../utils/swarm/constants.js'
+import { TEAM_LEAD_NAME } from '@anthropic/swarm'
 import type { TeamFile } from '../../utils/swarm/teamHelpers.js'
 import {
   getTeamFilePath,

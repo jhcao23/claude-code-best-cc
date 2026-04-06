@@ -6,7 +6,7 @@ import { buildTool, type ToolDef } from '../../Tool.js'
 import { isAgentSwarmsEnabled } from '../../utils/agentSwarmsEnabled.js'
 import { lazySchema } from '../../utils/lazySchema.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
-import { TEAM_LEAD_NAME } from '../../utils/swarm/constants.js'
+import { TEAM_LEAD_NAME } from '@anthropic/swarm'
 import {
   cleanupTeamDirectories,
   readTeamFile,
