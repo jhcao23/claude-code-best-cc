@@ -1,7 +1,7 @@
 /**
  * Transforms SDK messages for streamlined output mode.
  *
- * Streamlined mode is a "distillation-resistant" output format that:
+ * Streamlined mode is a compact output format that:
  * - Keeps text messages intact
  * - Summarizes tool calls with cumulative counts (resets when text appears)
  * - Omits thinking content
@@ -137,13 +137,14 @@ export function createStreamlinedTransformer(): (
   ): StdoutMessage | null {
     switch (message.type) {
       case 'assistant': {
-        const content = message.message.content
+        const messageContent = (message as SDKAssistantMessage).message
+        const content = messageContent?.content
         const text = Array.isArray(content)
           ? extractTextContent(content, '\n').trim()
           : ''
 
         // Accumulate tool counts from this message
-        accumulateToolUses(message, cumulativeCounts)
+        accumulateToolUses(message as SDKAssistantMessage, cumulativeCounts)
 
         if (text.length > 0) {
           // Text message: emit text only, reset counts
