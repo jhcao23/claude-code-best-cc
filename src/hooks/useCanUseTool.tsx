@@ -8,7 +8,7 @@ import {
 } from 'src/services/analytics/index.js'
 import { sanitizeToolNameForAnalytics } from 'src/services/analytics/metadata.js'
 import type { ToolUseConfirm } from '../components/permissions/PermissionRequest.js'
-import { Text } from '../ink.js'
+import { Text } from '@anthropic/ink'
 import type {
   ToolPermissionContext,
   Tool as ToolType,
@@ -152,7 +152,7 @@ function useCanUseTool(
                     tool,
                     input,
                     toolUseContext,
-                    messageId: ctx.messageId,
+                    messageId: ctx.messageId!,
                     toolUseID,
                   },
                   { decision: 'reject', source: 'config' },

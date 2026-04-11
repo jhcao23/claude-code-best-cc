@@ -3,7 +3,7 @@ import { z } from 'zod/v4'
 import { FallbackToolUseErrorMessage } from '../../components/FallbackToolUseErrorMessage.js'
 import { FallbackToolUseRejectedMessage } from '../../components/FallbackToolUseRejectedMessage.js'
 import { MessageResponse } from '../../components/MessageResponse.js'
-import { Box, Text } from '../../ink.js'
+import { Box, Text } from '@anthropic/ink'
 import { useShortcutDisplay } from '../../keybindings/useShortcutDisplay.js'
 import type { TaskType } from '../../Task.js'
 import type { Tool } from '../../Tool.js'
@@ -192,7 +192,7 @@ export const TaskOutputTool: Tool<InputSchema, TaskOutputToolOutput> =
     },
 
     isEnabled() {
-      return "external" !== 'ant'
+      return process.env.USER_TYPE !== 'ant'
     },
 
     isReadOnly(_input) {

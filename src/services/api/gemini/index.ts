@@ -14,6 +14,7 @@ import {
   normalizeContentFromAPI,
   normalizeMessagesForAPI,
 } from '../../../utils/messages.js'
+import type { SDKAssistantMessageError } from '../../../entrypoints/agentSdkTypes.js'
 import type { SystemPrompt } from '../../../utils/systemPromptType.js'
 import type { ThinkingConfig } from '../../../utils/thinking.js'
 import type { Options } from '../claude.js'
@@ -56,7 +57,7 @@ export async function* queryModelGemini(
 
     const standardTools = toolSchemas.filter(
       (t): t is BetaToolUnion & { type: string } => {
-        const anyTool = t as Record<string, unknown>
+        const anyTool = t as unknown as Record<string, unknown>
         return (
           anyTool.type !== 'advisor_20260301' &&
           anyTool.type !== 'computer_20250124'
@@ -186,7 +187,7 @@ export async function* queryModelGemini(
     yield createAssistantAPIErrorMessage({
       content: `API Error: ${errorMessage}`,
       apiError: 'api_error',
-      error: error instanceof Error ? error : new Error(String(error)),
+      error: (error instanceof Error ? error : new Error(String(error))) as unknown as SDKAssistantMessageError,
     })
   }
 }

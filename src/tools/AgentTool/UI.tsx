@@ -1,15 +1,16 @@
 import type {
+  ContentBlock,
   ToolResultBlockParam,
   ToolUseBlockParam,
 } from '@anthropic-ai/sdk/resources/index.mjs'
+type BetaContentBlock = ContentBlock | ToolResultBlockParam
 import * as React from 'react'
 import { ConfigurableShortcutHint } from 'src/components/ConfigurableShortcutHint.js'
 import {
   CtrlOToExpand,
   SubAgentProvider,
 } from 'src/components/CtrlOToExpand.js'
-import { Byline } from 'src/components/design-system/Byline.js'
-import { KeyboardShortcutHint } from 'src/components/design-system/KeyboardShortcutHint.js'
+import { Byline, KeyboardShortcutHint } from '@anthropic/ink'
 import type { z } from 'zod/v4'
 import { AgentProgressLine } from '../../components/AgentProgressLine.js'
 import { FallbackToolUseErrorMessage } from '../../components/FallbackToolUseErrorMessage.js'
@@ -18,7 +19,7 @@ import { Markdown } from '../../components/Markdown.js'
 import { Message as MessageComponent } from '../../components/Message.js'
 import { MessageResponse } from '../../components/MessageResponse.js'
 import { ToolUseLoader } from '../../components/ToolUseLoader.js'
-import { Box, Text } from '../../ink.js'
+import { Box, Text } from '@anthropic/ink'
 import { getDumpPromptsPath } from '../../services/api/dumpPrompts.js'
 import { findToolByName, type Tools } from '../../Tool.js'
 import type { Message, ProgressMessage } from '../../types/message.js'
@@ -50,6 +51,7 @@ import type {
 import { inputSchema } from './AgentTool.js'
 import { getAgentColor } from './agentColorManager.js'
 import { GENERAL_PURPOSE_AGENT } from './built-in/generalPurposeAgent.js'
+import { BetaUsage } from '@anthropic-ai/sdk/resources/beta.mjs'
 
 const MAX_PROGRESS_MESSAGES_TO_SHOW = 3
 
@@ -126,7 +128,7 @@ function processProgressMessages(
   isAgentRunning: boolean,
 ): ProcessedMessage[] {
   // Only process for ants
-  if ("external" !== 'ant') {
+  if (process.env.USER_TYPE !== 'ant') {
     return messages
       .filter(
         (m): m is ProgressMessage<AgentToolProgress> =>
@@ -412,7 +414,7 @@ export function renderToolResultMessage(
 
   const finalAssistantMessage = createAssistantMessage({
     content: completionMessage,
-    usage: { ...usage, inference_geo: null, iterations: null, speed: null },
+    usage: { ...usage, inference_geo: null, iterations: null, speed: null } as unknown as BetaUsage,
   })
 
   return (
@@ -555,7 +557,7 @@ export function renderToolUseProgressMessage(
       }
       const message = msg.data.message
       return message.message.content.some(
-        content => content.type === 'tool_use',
+        (content: BetaContentBlock) => content.type === 'tool_use',
       )
     })
 
@@ -630,7 +632,7 @@ export function renderToolUseProgressMessage(
       return false
     }
     return data.message.message.content.some(
-      content => content.type === 'tool_use',
+      (content: BetaContentBlock) => content.type === 'tool_use',
     )
   })
 
@@ -799,7 +801,7 @@ function calculateAgentStats(progressMessages: ProgressMessage<Progress>[]): {
     const message = msg.data.message
     return (
       message.type === 'user' &&
-      message.message.content.some(content => content.type === 'tool_result')
+      message.message.content.some((content: BetaContentBlock) => content.type === 'tool_result')
     )
   })
 
@@ -867,7 +869,7 @@ export function renderGroupedAgentToolUse(
         taskDescription = parsedInput.data.description
         // Use the custom agent definition's color on the type, not the name
         descriptionColor = isCustomSubagentType(subagentType)
-          ? (getAgentColor(subagentType) as keyof Theme | undefined)
+          ? getAgentColor(subagentType)
           : undefined
       } else {
         agentType = parsedInput.success
@@ -1020,7 +1022,7 @@ export function userFacingNameBackgroundColor(
   }
 
   // Get the color for this agent
-  return getAgentColor(input.subagent_type) as keyof Theme | undefined
+  return getAgentColor(input.subagent_type)
 }
 
 export function extractLastToolInfo(
@@ -1078,14 +1080,14 @@ export function extractLastToolInfo(
       const message = msg.data.message
       return (
         message.type === 'user' &&
-        message.message.content.some(c => c.type === 'tool_result')
+        message.message.content.some((c: BetaContentBlock) => c.type === 'tool_result')
       )
     },
   )
 
   if (lastToolResult?.data.message.type === 'user') {
     const toolResultBlock = lastToolResult.data.message.message.content.find(
-      c => c.type === 'tool_result',
+      (c: BetaContentBlock) => c.type === 'tool_result',
     )
 
     if (toolResultBlock?.type === 'tool_result') {

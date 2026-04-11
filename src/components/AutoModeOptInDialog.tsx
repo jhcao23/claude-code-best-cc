@@ -1,9 +1,8 @@
 import React from 'react'
 import { logEvent } from 'src/services/analytics/index.js'
-import { Box, Link, Text } from '../ink.js'
+import { Box, Dialog, Link, Text } from '@anthropic/ink'
 import { updateSettingsForSource } from '../utils/settings/settings.js'
 import { Select } from './CustomSelect/index.js'
-import { Dialog } from './design-system/Dialog.js'
 
 // NOTE: This copy is legally reviewed — do not modify without Legal team approval.
 export const AUTO_MODE_DESCRIPTION =
@@ -62,7 +61,7 @@ export function AutoModeOptInDialog({
 
       <Select
         options={[
-          ...("external" !== 'ant'
+          ...((process.env.USER_TYPE as string) !== 'ant'
             ? [
                 {
                   label: 'Yes, and make it my default mode',

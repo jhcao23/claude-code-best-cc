@@ -1,5 +1,6 @@
 import { feature } from 'bun:bundle'
 import figures from 'figures'
+import type { AgentId } from '../../types/ids.js'
 import React, {
   type ReactNode,
   useEffect,
@@ -45,14 +46,11 @@ import { stopUltraplan } from '../../commands/ultraplan.js'
 import type { CommandResultDisplay } from '../../commands.js'
 import { useRegisterOverlay } from '../../context/overlayContext.js'
 import type { ExitState } from '../../hooks/useExitOnCtrlCDWithKeybindings.js'
-import type { KeyboardEvent } from '../../ink/events/keyboard-event.js'
-import { Box, Text } from '../../ink.js'
+import { type KeyboardEvent, Box, Text } from '@anthropic/ink'
 import { useKeybindings } from '../../keybindings/useKeybinding.js'
 import { useShortcutDisplay } from '../../keybindings/useShortcutDisplay.js'
 import { count } from '../../utils/array.js'
-import { Byline } from '../design-system/Byline.js'
-import { Dialog } from '../design-system/Dialog.js'
-import { KeyboardShortcutHint } from '../design-system/KeyboardShortcutHint.js'
+import { Byline, Dialog, KeyboardShortcutHint } from '@anthropic/ink'
 import { AsyncAgentDetailDialog } from './AsyncAgentDetailDialog.js'
 import { BackgroundTask as BackgroundTaskComponent } from './BackgroundTask.js'
 import { DreamDetailDialog } from './DreamDetailDialog.js'
@@ -538,12 +536,12 @@ export function BackgroundTasksDialog({
             }
             onSkipAgent={
               task.status === 'running' && skipWorkflowAgent
-                ? agentId => skipWorkflowAgent(task.id, agentId, setAppState)
+                ? (agentId: AgentId) => skipWorkflowAgent(task.id, agentId, setAppState)
                 : undefined
             }
             onRetryAgent={
               task.status === 'running' && retryWorkflowAgent
-                ? agentId => retryWorkflowAgent(task.id, agentId, setAppState)
+                ? (agentId: AgentId) => retryWorkflowAgent(task.id, agentId, setAppState)
                 : undefined
             }
             onBack={goBackToList}

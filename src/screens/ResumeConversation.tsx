@@ -7,8 +7,8 @@ import type { Command } from '../commands.js'
 import { LogSelector } from '../components/LogSelector.js'
 import { Spinner } from '../components/Spinner.js'
 import { restoreCostStateForSession } from '../cost-tracker.js'
-import { setClipboard } from '../ink/termio/osc.js'
-import { Box, Text } from '../ink.js'
+import { setClipboard } from '@anthropic/ink'
+import { Box, Text } from '@anthropic/ink'
 import { useKeybinding } from '../keybindings/useKeybinding.js'
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -226,9 +226,10 @@ export function ResumeConversation({
     )
     if (crossProjectCheck.isCrossProject) {
       if (!crossProjectCheck.isSameRepoWorktree) {
-        const raw = await setClipboard(crossProjectCheck.command)
+        const cmd = (crossProjectCheck as { command: string }).command
+        const raw = await setClipboard(cmd)
         if (raw) process.stdout.write(raw)
-        setCrossProjectCommand(crossProjectCheck.command)
+        setCrossProjectCommand(cmd)
         return
       }
     }

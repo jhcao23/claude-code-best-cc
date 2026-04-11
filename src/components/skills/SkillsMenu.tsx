@@ -8,7 +8,8 @@ import {
   getCommandName,
   type PromptCommand,
 } from '../../commands.js'
-import { Box, Text } from '../../ink.js'
+import { Box, Text } from '@anthropic/ink'
+import type { Theme } from '@anthropic/ink'
 import {
   estimateSkillFrontmatterTokens,
   getSkillsPath,
@@ -21,7 +22,7 @@ import {
 } from '../../utils/settings/constants.js'
 import { plural } from '../../utils/stringUtils.js'
 import { ConfigurableShortcutHint } from '../ConfigurableShortcutHint.js'
-import { Dialog } from '../design-system/Dialog.js'
+import { Dialog } from '@anthropic/ink'
 
 // Skills are always PromptCommands with CommandBase properties
 type SkillCommand = CommandBase & PromptCommand
@@ -140,7 +141,7 @@ export function SkillsMenu({ onExit, commands }: Props): React.ReactNode {
   }
 
   const getScopeTag = (
-    source: SkillSource,
+    source: string,
   ): { label: string; color: string } | undefined => {
     switch (source) {
       case 'projectSettings':
@@ -162,13 +163,14 @@ export function SkillsMenu({ onExit, commands }: Props): React.ReactNode {
       skill.source === 'plugin'
         ? skill.pluginInfo?.pluginManifest.name
         : undefined
-    const scopeTag = getScopeTag(skill.source as SkillSource)
+    const scopeTag = getScopeTag(skill.source)
 
     return (
       <Box key={`${skill.name}-${skill.source}`}>
         <Text>{getCommandName(skill)}</Text>
         {scopeTag && (
-          <Text color={scopeTag.color}> [{scopeTag.label}]</Text>
+          <Text color={scopeTag.color as keyof Theme}> [{scopeTag.label}]</Text>
+
         )}
         <Text dimColor>
           {pluginName ? ` · ${pluginName}` : ''} · {tokenDisplay} description

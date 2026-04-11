@@ -19,7 +19,7 @@ import type {
   SDKMessage,
 } from '../entrypoints/agentSdkTypes.js'
 import type { SDKControlResponse } from '../entrypoints/sdk/controlTypes.js'
-import { Text } from '../ink.js'
+import { Text } from '@anthropic/ink'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import {
   useAppState,
@@ -44,6 +44,7 @@ import {
   transitionPermissionMode,
 } from '../utils/permissions/permissionSetup.js'
 import { getLeaderToolUseConfirmQueue } from '../utils/swarm/leaderPermissionBridge.js'
+import { ContentBlockParam } from '@anthropic-ai/sdk/resources'
 
 /** How long after a failure before replBridgeEnabled is auto-cleared (stops retries). */
 export const BRIDGE_FAILURE_DISMISS_MS = 10_000
@@ -225,15 +226,18 @@ export function useReplBridge(
               const { resolveAndPrepend } = await import(
                 '../bridge/inboundAttachments.js'
               )
-              let sanitized = fields.content
+              const rawContent = fields.content
+              let sanitized: string | Array<{ type: string; [key: string]: unknown }> = typeof rawContent === 'string' ? rawContent : rawContent as unknown as Array<{ type: string; [key: string]: unknown }>
               if (feature('KAIROS_GITHUB_WEBHOOKS')) {
                 /* eslint-disable @typescript-eslint/no-require-imports */
                 const { sanitizeInboundWebhookContent } =
                   require('../bridge/webhookSanitizer.js') as typeof import('../bridge/webhookSanitizer.js')
                 /* eslint-enable @typescript-eslint/no-require-imports */
-                sanitized = sanitizeInboundWebhookContent(fields.content)
+                if (typeof sanitized === 'string') {
+                  sanitized = sanitizeInboundWebhookContent(sanitized)
+                }
               }
-              const content = await resolveAndPrepend(msg, sanitized)
+              const content = await resolveAndPrepend(msg, sanitized as string | ContentBlockParam[])
 
               const preview =
                 typeof content === 'string'

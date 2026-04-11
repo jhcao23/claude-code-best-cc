@@ -63,9 +63,7 @@ import { useMainLoopModel } from '../../hooks/useMainLoopModel.js'
 import { usePromptSuggestion } from '../../hooks/usePromptSuggestion.js'
 import { useTerminalSize } from '../../hooks/useTerminalSize.js'
 import { useTypeahead } from '../../hooks/useTypeahead.js'
-import type { BorderTextOptions } from '../../ink/render-border.js'
-import { stringWidth } from '../../ink/stringWidth.js'
-import { Box, type ClickEvent, type Key, Text, useInput } from '../../ink.js'
+import { Box, type BorderTextOptions, type ClickEvent, type Key, stringWidth, Text, useInput } from '@anthropic/ink'
 import { useOptionalKeybindingContext } from '../../keybindings/KeybindingContext.js'
 import { getShortcutDisplay } from '../../keybindings/shortcutFormat.js'
 import {
@@ -1410,7 +1408,7 @@ function PromptInput({
             clearBuffer()
             resetHistory()
             return
-          } else if (result.error === 'no_team_context') {
+          } else if (!result.success && (result as { error: string }).error === 'no_team_context') {
             // No team context - fall through to normal prompt submission
           } else {
             // Unknown recipient - fall through to normal prompt submission
@@ -3137,13 +3135,13 @@ function getInitialPasteId(messages: Message[]): number {
     if (message.type === 'user') {
       // Check image paste IDs
       if (message.imagePasteIds) {
-        for (const id of message.imagePasteIds) {
+        for (const id of message.imagePasteIds as number[]) {
           if (id > maxId) maxId = id
         }
       }
       // Check text paste references in message content
-      if (Array.isArray(message.message.content)) {
-        for (const block of message.message.content) {
+      if (Array.isArray(message.message!.content)) {
+        for (const block of message.message!.content) {
           if (block.type === 'text') {
             const refs = parseReferences(block.text)
             for (const ref of refs) {

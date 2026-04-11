@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useMemoryUsage } from '../hooks/useMemoryUsage.js'
-import { Box, Text } from '../ink.js'
+import { Box, Text } from '@anthropic/ink'
 import { formatFileSize } from '../utils/format.js'
 
 export function MemoryUsageIndicator(): React.ReactNode {
@@ -8,7 +8,7 @@ export function MemoryUsageIndicator(): React.ReactNode {
   // the hook means the 10s polling interval is never set up in external builds.
   // USER_TYPE is a build-time constant, so the hook call below is either always
   // reached or dead-code-eliminated — never conditional at runtime.
-  if ("external" !== 'ant') {
+  if (process.env.USER_TYPE !== 'ant') {
     return null
   }
 

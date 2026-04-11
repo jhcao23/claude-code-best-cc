@@ -1,287 +1,73 @@
-import { randomUUID, type UUID } from 'crypto'
-import { mkdir, readFile, writeFile } from 'fs/promises'
-import { getOriginalCwd, getSessionId } from '../../bootstrap/state.js'
-import type { LocalJSXCommandContext } from '../../commands.js'
-import { logEvent } from '../../services/analytics/index.js'
-import type { LocalJSXCommandOnDone } from '../../types/command.js'
-import type {
-  ContentReplacementEntry,
-  Entry,
-  LogOption,
-  SerializedMessage,
-  TranscriptMessage,
-} from '../../types/logs.js'
-import { parseJSONL } from '../../utils/json.js'
-import {
-  getProjectDir,
-  getTranscriptPath,
-  getTranscriptPathForSession,
-  isTranscriptMessage,
-  saveCustomTitle,
-  searchSessionsByCustomTitle,
-} from '../../utils/sessionStorage.js'
-import { jsonStringify } from '../../utils/slowOperations.js'
-import { escapeRegExp } from '../../utils/stringUtils.js'
-
-type TranscriptEntry = TranscriptMessage & {
-  forkedFrom?: {
-    sessionId: string
-    messageUuid: UUID
-  }
-}
-
-/**
- * Derive a single-line title base from the first user message.
- * Collapses whitespace so multiline first messages don't break the saved title.
- */
-function deriveFirstPrompt(
-  firstUserMessage: Extract<SerializedMessage, { type: 'user' }> | undefined,
-): string {
-  const content = firstUserMessage?.message?.content
-  if (!content) return 'Forked conversation'
-  const raw =
-    typeof content === 'string'
-      ? content
-      : content.find(
-          (block): block is { type: 'text'; text: string } =>
-            block.type === 'text',
-        )?.text
-  if (!raw) return 'Forked conversation'
-  return (
-    raw.replace(/\s+/g, ' ').trim().slice(0, 100) || 'Forked conversation'
-  )
-}
-
-/**
- * Creates a fork of the current conversation by copying from the transcript file.
- * Preserves all original metadata (timestamps, gitBranch, etc.) while updating
- * sessionId and adding forkedFrom traceability.
- */
-async function createFork(customTitle?: string): Promise<{
-  sessionId: UUID
-  title: string | undefined
-  forkPath: string
-  serializedMessages: SerializedMessage[]
-  contentReplacementRecords: ContentReplacementEntry['replacements']
-}> {
-  const forkSessionId = randomUUID() as UUID
-  const originalSessionId = getSessionId()
-  const projectDir = getProjectDir(getOriginalCwd())
-  const forkSessionPath = getTranscriptPathForSession(forkSessionId)
-  const currentTranscriptPath = getTranscriptPath()
-
-  // Ensure project directory exists
-  await mkdir(projectDir, { recursive: true, mode: 0o700 })
-
-  // Read current transcript file
-  let transcriptContent: Buffer
-  try {
-    transcriptContent = await readFile(currentTranscriptPath)
-  } catch {
-    throw new Error('No conversation to fork')
-  }
-
-  if (transcriptContent.length === 0) {
-    throw new Error('No conversation to fork')
-  }
-
-  // Parse all transcript entries (messages + metadata entries like content-replacement)
-  const entries = parseJSONL<Entry>(transcriptContent)
-
-  // Filter to only main conversation messages (exclude sidechains and non-message entries)
-  const mainConversationEntries = entries.filter(
-    (entry): entry is TranscriptMessage =>
-      isTranscriptMessage(entry) && !entry.isSidechain,
-  )
-
-  // Content-replacement entries for the original session. These record which
-  // tool_result blocks were replaced with previews by the per-message budget.
-  // Without them in the fork JSONL, resuming the fork reconstructs state with
-  // an empty replacements Map, causing prompt cache misses.
-  const contentReplacementRecords = entries
-    .filter(
-      (entry): entry is ContentReplacementEntry =>
-        entry.type === 'content-replacement' &&
-        entry.sessionId === originalSessionId,
-    )
-    .flatMap(entry => entry.replacements)
-
-  if (mainConversationEntries.length === 0) {
-    throw new Error('No messages to fork')
-  }
-
-  // Build forked entries with new sessionId and preserved metadata
-  let parentUuid: UUID | null = null
-  const lines: string[] = []
-  const serializedMessages: SerializedMessage[] = []
-
-  for (const entry of mainConversationEntries) {
-    // Create forked transcript entry preserving all original metadata
-    const forkedEntry: TranscriptEntry = {
-      ...entry,
-      sessionId: forkSessionId,
-      parentUuid,
-      isSidechain: false,
-      forkedFrom: {
-        sessionId: originalSessionId,
-        messageUuid: entry.uuid,
-      },
-    }
-
-    // Build serialized message for LogOption
-    const serialized: SerializedMessage = {
-      ...entry,
-      sessionId: forkSessionId,
-    }
-
-    serializedMessages.push(serialized)
-    lines.push(jsonStringify(forkedEntry))
-    if (entry.type !== 'progress') {
-      parentUuid = entry.uuid
-    }
-  }
-
-  // Append content-replacement entry (if any) with the fork's sessionId.
-  if (contentReplacementRecords.length > 0) {
-    const forkedReplacementEntry: ContentReplacementEntry = {
-      type: 'content-replacement',
-      sessionId: forkSessionId,
-      replacements: contentReplacementRecords,
-    }
-    lines.push(jsonStringify(forkedReplacementEntry))
-  }
-
-  // Write the fork session file
-  await writeFile(forkSessionPath, lines.join('\n') + '\n', {
-    encoding: 'utf8',
-    mode: 0o600,
-  })
-
-  return {
-    sessionId: forkSessionId,
-    title: customTitle,
-    forkPath: forkSessionPath,
-    serializedMessages,
-    contentReplacementRecords,
-  }
-}
-
-/**
- * Generates a unique fork name by checking for collisions with existing session names.
- * If "baseName (Fork)" already exists, tries "baseName (Fork 2)", "baseName (Fork 3)", etc.
- */
-async function getUniqueForkName(baseName: string): Promise<string> {
-  const candidateName = `${baseName} (Fork)`
-
-  // Check if this exact name already exists
-  const existingWithExactName = await searchSessionsByCustomTitle(
-    candidateName,
-    { exact: true },
-  )
-
-  if (existingWithExactName.length === 0) {
-    return candidateName
-  }
-
-  // Name collision - find a unique numbered suffix
-  const existingForks = await searchSessionsByCustomTitle(`${baseName} (Fork`)
-
-  // Extract existing fork numbers to find the next available
-  const usedNumbers = new Set<number>([1]) // Consider " (Fork)" as number 1
-  const forkNumberPattern = new RegExp(
-    `^${escapeRegExp(baseName)} \\(Fork(?: (\\d+))?\\)$`,
-  )
-
-  for (const session of existingForks) {
-    const match = session.customTitle?.match(forkNumberPattern)
-    if (match) {
-      if (match[1]) {
-        usedNumbers.add(parseInt(match[1], 10))
-      } else {
-        usedNumbers.add(1) // " (Fork)" without number is treated as 1
-      }
-    }
-  }
-
-  // Find the next available number
-  let nextNumber = 2
-  while (usedNumbers.has(nextNumber)) {
-    nextNumber++
-  }
-
-  return `${baseName} (Fork ${nextNumber})`
-}
+import { feature } from 'bun:bundle'
+import React from 'react'
+import { AgentTool } from '../../tools/AgentTool/AgentTool.js'
+import { isInForkChild } from '../../tools/AgentTool/forkSubagent.js'
+import { logForDebugging } from '../../utils/debug.js'
+import type { LocalJSXCommandOnDone, LocalJSXCommandContext } from '../../types/command.js'
 
 export async function call(
   onDone: LocalJSXCommandOnDone,
   context: LocalJSXCommandContext,
   args: string,
 ): Promise<React.ReactNode> {
-  const customTitle = args?.trim() || undefined
+  // Check feature flag
+  if (!feature('FORK_SUBAGENT')) {
+    onDone('Fork subagent feature is not enabled. Set FEATURE_FORK_SUBAGENT=1 to enable.', { display: 'system' })
+    return null
+  }
 
-  const originalSessionId = getSessionId()
+  // Recursive fork guard
+  if (isInForkChild(context.messages)) {
+    onDone('Fork is not available inside a forked worker. Complete your task directly using your tools.', { display: 'system' })
+    return null
+  }
+
+  const directive = args.trim()
+  if (!directive) {
+    onDone('Usage: /fork <directive>\nExample: /fork Fix the null check in validate.ts', { display: 'system' })
+    return null
+  }
+
+  // Find the last assistant message to fork from
+  const lastAssistantMessage = [...context.messages].reverse().find(
+    m => m.type === 'assistant'
+  ) as any // Type assertion to avoid complex type import
+
+  if (!lastAssistantMessage) {
+    onDone('Cannot fork: no assistant response in conversation history.', { display: 'system' })
+    return null
+  }
 
   try {
-    const {
-      sessionId,
-      title,
-      forkPath,
-      serializedMessages,
-      contentReplacementRecords,
-    } = await createFork(customTitle)
+    // Reuse AgentTool logic for fork path.
+    // Omitting subagent_type triggers implicit fork.
+    const input = {
+      prompt: directive,
+      run_in_background: true, // fork always runs async
+      description: `Fork: ${directive.slice(0, 30)}${directive.length > 30 ? '...' : ''}`,
+    }
 
-    // Build LogOption for resume
-    const now = new Date()
-    const firstPrompt = deriveFirstPrompt(
-      serializedMessages.find(m => m.type === 'user'),
-    )
-
-    // Save custom title with " (Fork)" suffix
-    // Handle collisions by adding a number suffix (e.g., " (Fork 2)", " (Fork 3)")
-    const baseName = title ?? firstPrompt
-    const effectiveTitle = await getUniqueForkName(baseName)
-    await saveCustomTitle(sessionId, effectiveTitle, forkPath)
-
-    logEvent('tengu_conversation_forked', {
-      message_count: serializedMessages.length,
-      has_custom_title: !!title,
+    // Call AgentTool with proper parameters:
+    // - input: the agent parameters (no subagent_type => fork path)
+    // - toolUseContext: the current context (ToolUseContext)
+    // - canUseTool: permission-check function from context
+    // - assistantMessage: the last assistant message to fork from
+    AgentTool.call(
+      input,
+      context,
+      context.canUseTool!,
+      lastAssistantMessage
+    ).catch(error => {
+      logForDebugging(`Fork subagent async error: ${error}`, { level: 'error' })
     })
 
-    const forkLog: LogOption = {
-      date: now.toISOString().split('T')[0]!,
-      messages: serializedMessages,
-      fullPath: forkPath,
-      value: now.getTime(),
-      created: now,
-      modified: now,
-      firstPrompt,
-      messageCount: serializedMessages.length,
-      isSidechain: false,
-      sessionId,
-      customTitle: effectiveTitle,
-      contentReplacements: contentReplacementRecords,
-    }
-
-    // Resume into the fork
-    const titleInfo = title ? ` "${title}"` : ''
-    const resumeHint = `\nTo resume the original: claude -r ${originalSessionId}`
-    const successMessage = `Forked conversation${titleInfo}. You are now in the fork.${resumeHint}`
-
-    if (context.resume) {
-      await context.resume(sessionId, forkLog, 'fork')
-      onDone(successMessage, { display: 'system' })
-    } else {
-      // Fallback if resume not available
-      onDone(
-        `Forked conversation${titleInfo}. Resume with: /resume ${sessionId}`,
-      )
-    }
-
+    // Notify user that fork has been started
+    onDone(`Forked subagent started with directive: "${directive}"`, { display: 'system' })
     return null
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown error occurred'
-    onDone(`Failed to fork conversation: ${message}`)
+    // Catches synchronous setup errors only
+    logForDebugging(`Fork command setup error: ${error}`, { level: 'error' })
+    onDone(`Fork failed: ${error instanceof Error ? error.message : String(error)}`, { display: 'system' })
     return null
   }
 }

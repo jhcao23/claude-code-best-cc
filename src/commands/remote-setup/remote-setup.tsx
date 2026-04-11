@@ -2,9 +2,7 @@ import { execa } from 'execa'
 import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { Select } from '../../components/CustomSelect/index.js'
-import { Dialog } from '../../components/design-system/Dialog.js'
-import { LoadingState } from '../../components/design-system/LoadingState.js'
-import { Box, Text } from '../../ink.js'
+import { Box, Dialog, LoadingState, Text } from '@anthropic/ink'
 import {
   logEvent,
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS as SafeString,
@@ -120,11 +118,12 @@ function Web({ onDone }: { onDone: LocalJSXCommandOnDone }) {
 
     const result = await importGithubToken(token)
     if (!result.ok) {
+      const err = (result as { ok: false; error: ImportTokenError }).error
       logEvent('tengu_remote_setup_result', {
         result: 'import_failed' as SafeString,
-        error_kind: result.error.kind as SafeString,
+        error_kind: err.kind as SafeString,
       })
-      onDone(errorMessage(result.error, getCodeWebUrl()))
+      onDone(errorMessage(err, getCodeWebUrl()))
       return
     }
 

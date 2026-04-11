@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { formatCost } from '../cost-tracker.js';
-import { Box, Text } from '../ink.js';
+import { Box, Text, ProgressBar } from '@anthropic/ink';
 import { formatTokens } from '../utils/format.js';
-import { ProgressBar } from './design-system/ProgressBar.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
 type RateLimitBucket = {
@@ -56,7 +55,7 @@ function BuiltinStatusLineInner({
   // Force re-render every 60s so countdowns stay current
   const [tick, setTick] = useState(0);
   useEffect(() => {
-    const hasResetTime = rateLimits.five_hour?.resets_at || rateLimits.seven_day?.resets_at;
+    const hasResetTime = (rateLimits.five_hour?.resets_at ?? 0) || (rateLimits.seven_day?.resets_at ?? 0);
     if (!hasResetTime) return;
     const id = setInterval(() => setTick(t => t + 1), 60_000);
     return () => clearInterval(id);
@@ -82,7 +81,7 @@ function BuiltinStatusLineInner({
   const tokenDisplay = `${formatTokens(usedTokens)}/${formatTokens(contextWindowSize)}`;
 
   return (
-    <Box wrap="truncate">
+    <Box>
       {/* Model name */}
       <Text>{shortModel}</Text>
 

@@ -3,13 +3,11 @@ import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
 } from 'src/services/analytics/index.js'
-import { KeyboardShortcutHint } from '../../components/design-system/KeyboardShortcutHint.js'
+import { KeyboardShortcutHint } from '@anthropic/ink'
 import { Spinner } from '../../components/Spinner.js'
 import TextInput from '../../components/TextInput.js'
 import { useTerminalSize } from '../../hooks/useTerminalSize.js'
-import type { KeyboardEvent } from '../../ink/events/keyboard-event.js'
-import { setClipboard } from '../../ink/termio/osc.js'
-import { Box, Link, Text } from '../../ink.js'
+import { type KeyboardEvent, setClipboard, Box, Link, Text } from '@anthropic/ink'
 import { OAuthService } from '../../services/oauth/index.js'
 import { saveOAuthTokensIfNeeded } from '../../utils/auth.js'
 import { logError } from '../../utils/log.js'
@@ -129,7 +127,7 @@ export function OAuthFlowStep({
           setOAuthStatus({ state: 'success', token: accessToken })
           // Auto-continue after brief delay to show success
           const timer2 = setTimeout(onSuccess, 1000, accessToken)
-          timersRef.current.add(timer2)
+          timersRef.current.add(timer2 as unknown as NodeJS.Timeout)
         },
         100,
         setOAuthStatus,

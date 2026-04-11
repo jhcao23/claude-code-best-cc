@@ -15,7 +15,7 @@
 [文档在这里, 支持投稿 PR](https://ccb.agent-aura.top/) | [留影文档在这里](./Friends.md) | [Discord 群组](https://discord.gg/qZU6zS7Q)
 
 - ✅ [x] V4 — 测试补全、[Buddy](https://ccb.agent-aura.top/docs/features/buddy)、[Auto Mode](https://ccb.agent-aura.top/docs/safety/auto-mode)、环境变量 Feature 开关
-- ✅ [x] V5 — [Sentry](https://ccb.agent-aura.top/docs/internals/sentry-setup) / [GrowthBook](https://ccb.agent-aura.top/docs/internals/growthbook-adapter) 企业监控、[自定义 Login](https://ccb.agent-aura.top/docs/features/custom-platform-login)、[OpenAI 兼容](https://ccb.agent-aura.top/docs/plans/openai-compatibility)、[Web Search](https://ccb.agent-aura.top/docs/features/web-browser-tool)、[Computer Use](https://ccb.agent-aura.top/docs/features/computer-use) / [Chrome Use](https://ccb.agent-aura.top/docs/features/claude-in-chrome-mcp)、[Voice Mode](https://ccb.agent-aura.top/docs/features/voice-mode)、[Bridge Mode](https://ccb.agent-aura.top/docs/features/bridge-mode)、[/dream 记忆整理](https://ccb.agent-aura.top/docs/features/auto-dream)、**全网独家支持 Claude 群控技术** — [Pipe IPC 多实例协作](https://ccb.agent-aura.top/docs/features/pipes-and-lan)（同机 main/sub 自动编排 + [LAN 跨机器零配置发现与通讯](https://ccb.agent-aura.top/docs/features/lan-pipes)，`/pipes` 选择面板 + `Shift+↓` 交互 + 消息广播路由）
+- ✅ [x] V5 — [Sentry](https://ccb.agent-aura.top/docs/internals/sentry-setup) / [GrowthBook](https://ccb.agent-aura.top/docs/internals/growthbook-adapter) 企业监控、[自定义 Login](https://ccb.agent-aura.top/docs/features/custom-platform-login)、[OpenAI 兼容](https://ccb.agent-aura.top/docs/plans/openai-compatibility)、[Web Search](https://ccb.agent-aura.top/docs/features/web-browser-tool)、[Computer Use](https://ccb.agent-aura.top/docs/features/computer-use) / [Chrome Use](https://ccb.agent-aura.top/docs/features/claude-in-chrome-mcp)、[Voice Mode](https://ccb.agent-aura.top/docs/features/voice-mode)、[Bridge Mode](https://ccb.agent-aura.top/docs/features/bridge-mode)、[Remote Control 私有部署](https://ccb.agent-aura.top/docs/features/remote-control-self-hosting)、[/dream 记忆整理](https://ccb.agent-aura.top/docs/features/auto-dream)、**全网独家支持 Claude 群控技术** — [Pipe IPC 多实例协作](https://ccb.agent-aura.top/docs/features/pipes-and-lan)（同机 main/sub 自动编排 + [LAN 跨机器零配置发现与通讯](https://ccb.agent-aura.top/docs/features/lan-pipes)，`/pipes` 选择面板 + `Shift+↓` 交互 + 消息广播路由）
 - 🔮 [ ] V6 — 大规模重构石山代码，全面模块分包（全新分支，main 封存为历史版本）
 
 - 🚀 [想要启动项目](#快速开始源码版)
@@ -31,13 +31,10 @@
 bun  i -g claude-code-best
 bun pm -g trust claude-code-best
 ccb # 直接打开 claude code
+CLAUDE_BRIDGE_BASE_URL=https://remote-control.claude-code-best.win/ CLAUDE_BRIDGE_OAUTH_TOKEN=test-my-key bun run dev --remote-control # 我们有自部署的远程控制
 ```
 
-⚠️ 国内对 github 网络较差的, 需要先设置这个环境变量
-
-```bash
-DEFAULT_RELEASE_BASE=https://ghproxy.net/https://github.com/microsoft/ripgrep-prebuilt/releases/download/v15.0.1
-```
+⚠️ 如果 GitHub 下载 ripgrep 失败，postinstall 会自动回退到 ghproxy.net 镜像，无需手动配置。
 
 ## ⚡ 快速开始(源码版)
 
@@ -52,12 +49,6 @@ DEFAULT_RELEASE_BASE=https://ghproxy.net/https://github.com/microsoft/ripgrep-pr
 
 ```bash
 bun install
-```
-
-⚠️ 国内对 github 网络较差的,可以使用这个环境变量
-
-```bash
-DEFAULT_RELEASE_BASE=https://ghproxy.net/https://github.com/microsoft/ripgrep-prebuilt/releases/download/v15.0.1
 ```
 
 ### ▶️ 运行

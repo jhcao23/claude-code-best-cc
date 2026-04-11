@@ -2,12 +2,17 @@ import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages/me
 import type { SystemPrompt } from '../../../utils/systemPromptType.js'
 import type { Message, StreamEvent, SystemAPIErrorMessage, AssistantMessage } from '../../../types/message.js'
 import type { Tools } from '../../../Tool.js'
+import type {
+  ChatCompletionChunk,
+  ChatCompletionCreateParamsStreaming,
+} from 'openai/resources/chat/completions/completions.mjs'
 import { getGrokClient } from './client.js'
 import { anthropicMessagesToOpenAI } from '../openai/convertMessages.js'
 import { anthropicToolsToOpenAI, anthropicToolChoiceToOpenAI } from '../openai/convertTools.js'
 import { adaptOpenAIStreamToAnthropic } from '../openai/streamAdapter.js'
 import { resolveGrokModel } from './modelMapping.js'
 import { normalizeMessagesForAPI } from '../../../utils/messages.js'
+import type { SDKAssistantMessageError } from '../../../entrypoints/agentSdkTypes.js'
 import { toolToAPISchema } from '../../../utils/api.js'
 import { logForDebugging } from '../../../utils/debug.js'
 import { addToTotalSessionCost } from '../../../cost-tracker.js'
@@ -51,7 +56,7 @@ export async function* queryModelGrok(
     )
     const standardTools = toolSchemas.filter(
       (t): t is BetaToolUnion & { type: string } => {
-        const anyT = t as Record<string, unknown>
+        const anyT = t as unknown as Record<string, unknown>
         return anyT.type !== 'advisor_20260301' && anyT.type !== 'computer_20250124'
       },
     )
@@ -62,7 +67,7 @@ export async function* queryModelGrok(
 
     const client = getGrokClient({
       maxRetries: 0,
-      fetchOverride: options.fetchOverride,
+      fetchOverride: options.fetchOverride as typeof fetch | undefined,
       source: options.querySource,
     })
 
@@ -81,13 +86,13 @@ export async function* queryModelGrok(
         ...(options.temperatureOverride !== undefined && {
           temperature: options.temperatureOverride,
         }),
-      },
+      } as ChatCompletionCreateParamsStreaming,
       {
         signal,
       },
     )
 
-    const adaptedStream = adaptOpenAIStreamToAnthropic(stream, grokModel)
+    const adaptedStream = adaptOpenAIStreamToAnthropic(stream as AsyncIterable<ChatCompletionChunk>, grokModel)
 
     const contentBlocks: Record<number, any> = {}
     let partialMessage: any = undefined
@@ -186,7 +191,7 @@ export async function* queryModelGrok(
     yield createAssistantAPIErrorMessage({
       content: `API Error: ${errorMessage}`,
       apiError: 'api_error',
-      error: error instanceof Error ? error : new Error(String(error)),
+      error: (error instanceof Error ? error : new Error(String(error))) as unknown as SDKAssistantMessageError,
     })
   }
 }

@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react'
 import { getOriginalCwd } from '../../bootstrap/state.js'
-import { Box, Text, useTheme } from '../../ink.js'
+import { Box, Text, useTheme } from '@anthropic/ink'
 import { sanitizeToolNameForAnalytics } from '../../services/analytics/metadata.js'
 import { env } from '../../utils/env.js'
 import { shouldShowAlwaysAllowOptions } from '../../utils/permissions/permissionsLoader.js'
@@ -53,7 +53,7 @@ export function FallbackPermissionRequest({
             event: 'accept',
             metadata: {
               language_name: 'none',
-              message_id: toolUseConfirm.assistantMessage.message.id,
+              message_id: toolUseConfirm.assistantMessage.message.id!,
               platform: env.platform,
             },
           })
@@ -66,7 +66,7 @@ export function FallbackPermissionRequest({
             event: 'accept',
             metadata: {
               language_name: 'none',
-              message_id: toolUseConfirm.assistantMessage.message.id,
+              message_id: toolUseConfirm.assistantMessage.message.id!,
               platform: env.platform,
             },
           })
@@ -92,7 +92,7 @@ export function FallbackPermissionRequest({
             event: 'reject',
             metadata: {
               language_name: 'none',
-              message_id: toolUseConfirm.assistantMessage.message.id,
+              message_id: toolUseConfirm.assistantMessage.message.id!,
               platform: env.platform,
             },
           })
@@ -111,7 +111,7 @@ export function FallbackPermissionRequest({
       event: 'reject',
       metadata: {
         language_name: 'none',
-        message_id: toolUseConfirm.assistantMessage.message.id,
+        message_id: toolUseConfirm.assistantMessage.message.id!,
         platform: env.platform,
       },
     })

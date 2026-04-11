@@ -8,7 +8,7 @@ import { BRIDGE_LOGIN_INSTRUCTION } from '../../bridge/types.js';
 import { Dialog } from '../../components/design-system/Dialog.js';
 import { ListItem } from '../../components/design-system/ListItem.js';
 import { useRegisterOverlay } from '../../context/overlayContext.js';
-import { Box, Text } from '../../ink.js';
+import { Box, Text } from '@anthropic/ink';
 import { useKeybindings } from '../../keybindings/useKeybinding.js';
 import type { ToolUseContext } from '../../Tool.js';
 import type { LocalJSXCommandContext, LocalJSXCommandOnDone } from '../../types/command.js';
@@ -148,7 +148,7 @@ function ServerManagementDialog({ onDone }: Props): React.ReactNode {
       <Box flexDirection="column" gap={1}>
         <Text>
           Remote Control Server is{' '}
-          <Text bold color="green">
+          <Text bold color="success">
             running
           </Text>
           {daemonProcess ? ` (PID: ${daemonProcess.pid})` : ''}
@@ -233,10 +233,10 @@ function startDaemon(): void {
     }
   });
 
-  child.on('exit', (code, signal) => {
+  child.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
     daemonProcess = null;
     daemonStatus = 'stopped';
-    daemonLogs.push(`[daemon] exited (code=${code}, signal=${signal})`);
+    daemonLogs.push(`[daemon] exited (code=${code ?? 'unknown'}, signal=${signal})`);
   });
 
   child.on('error', (err: Error) => {

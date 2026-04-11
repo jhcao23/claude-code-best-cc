@@ -9,11 +9,8 @@ import { getSystemPrompt } from '../../constants/prompts.js'
 import { useModalOrTerminalSize } from '../../context/modalContext.js'
 import { getSystemContext, getUserContext } from '../../context.js'
 import { useTerminalSize } from '../../hooks/useTerminalSize.js'
-import ScrollBox, {
-  type ScrollBoxHandle,
-} from '../../ink/components/ScrollBox.js'
-import type { KeyboardEvent } from '../../ink/events/keyboard-event.js'
-import { Box, Text } from '../../ink.js'
+import { type KeyboardEvent, type ScrollBoxHandle, ScrollBox } from '@anthropic/ink'
+import { Box, Text } from '@anthropic/ink'
 import type { LocalJSXCommandOnDone } from '../../types/command.js'
 import type { Message } from '../../types/message.js'
 import { createAbortController } from '../../utils/abortController.js'
@@ -165,7 +162,7 @@ function BtwSideQuestion({
  */
 function stripInProgressAssistantMessage(messages: Message[]): Message[] {
   const last = messages.at(-1)
-  if (last?.type === 'assistant' && last.message.stop_reason === null) {
+  if (last?.type === 'assistant' && last.message!.stop_reason === null) {
     return messages.slice(0, -1)
   }
   return messages

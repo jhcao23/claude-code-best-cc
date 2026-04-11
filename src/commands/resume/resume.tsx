@@ -9,8 +9,8 @@ import { MessageResponse } from '../../components/MessageResponse.js'
 import { Spinner } from '../../components/Spinner.js'
 import { useIsInsideModal } from '../../context/modalContext.js'
 import { useTerminalSize } from '../../hooks/useTerminalSize.js'
-import { setClipboard } from '../../ink/termio/osc.js'
-import { Box, Text } from '../../ink.js'
+import { setClipboard } from '@anthropic/ink'
+import { Box, Text } from '@anthropic/ink'
 import type { LocalJSXCommandCall } from '../../types/command.js'
 import type { LogOption } from '../../types/logs.js'
 import { agenticSessionSearch } from '../../utils/agenticSessionSearch.js'
@@ -152,7 +152,7 @@ function ResumeCommand({
       }
 
       // Different project - show command instead of resuming
-      const raw = await setClipboard(crossProjectCheck.command)
+      const raw = await setClipboard((crossProjectCheck as { command: string }).command)
       if (raw) process.stdout.write(raw)
 
       // Format the output message
@@ -161,7 +161,7 @@ function ResumeCommand({
         'This conversation is from a different directory.',
         '',
         'To resume, run:',
-        `  ${crossProjectCheck.command}`,
+        `  ${(crossProjectCheck as { command: string }).command}`,
         '',
         '(Command copied to clipboard)',
         '',

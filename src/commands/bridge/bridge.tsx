@@ -13,11 +13,10 @@ import {
   BRIDGE_LOGIN_INSTRUCTION,
   REMOTE_CONTROL_DISCONNECTED_MSG,
 } from '../../bridge/types.js'
-import { Dialog } from '../../components/design-system/Dialog.js'
-import { ListItem } from '../../components/design-system/ListItem.js'
+import { Dialog, ListItem } from '@anthropic/ink'
 import { shouldShowRemoteCallout } from '../../components/RemoteCallout.js'
 import { useRegisterOverlay } from '../../context/overlayContext.js'
-import { Box, Text } from '../../ink.js'
+import { Box, Text } from '@anthropic/ink'
 import { useKeybindings } from '../../keybindings/useKeybinding.js'
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -155,7 +154,7 @@ function BridgeDisconnectDialog({ onDone }: Props): React.ReactNode {
       type: 'utf8',
       errorCorrectionLevel: 'L',
       small: true,
-    })
+    } as Parameters<typeof qrToString>[1])
       .then(setQrText)
       .catch(() => setQrText(''))
   }, [showQR, displayUrl])

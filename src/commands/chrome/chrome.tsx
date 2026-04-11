@@ -3,8 +3,8 @@ import {
   type OptionWithDescription,
   Select,
 } from '../../components/CustomSelect/select.js'
-import { Dialog } from '../../components/design-system/Dialog.js'
-import { Box, Text } from '../../ink.js'
+import { Dialog } from '@anthropic/ink'
+import { Box, Text } from '@anthropic/ink'
 import { useAppState } from '../../state/AppState.js'
 import { isClaudeAISubscriber } from '../../utils/auth.js'
 import { openBrowser } from '../../utils/browser.js'
@@ -136,7 +136,7 @@ function ClaudeInChromeMenu({
   )
 
   const isDisabled =
-    isWSL || ("external" !== 'ant' && !isClaudeAISubscriber)
+    isWSL || ((process.env.USER_TYPE as string) !== 'ant' && !isClaudeAISubscriber)
 
   return (
     <Dialog
@@ -159,7 +159,7 @@ function ClaudeInChromeMenu({
         )}
 
 
-        {"external" !== 'ant' && !isClaudeAISubscriber && (
+        {(process.env.USER_TYPE as string) !== 'ant' && !isClaudeAISubscriber && (
           <Text color="error">
             Claude in Chrome requires a claude.ai subscription.
           </Text>

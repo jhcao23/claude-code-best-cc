@@ -8,7 +8,7 @@ import pMap from 'p-map'
 import { cwd } from 'process'
 import React from 'react'
 import { MCPServerDesktopImportDialog } from '../../components/MCPServerDesktopImportDialog.js'
-import { render } from '../../ink.js'
+import { wrappedRender as render } from '@anthropic/ink'
 import { KeybindingSetup } from '../../keybindings/KeybindingProviderSetup.js'
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -222,9 +222,10 @@ export async function mcpListHandler(): Promise<void> {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.log(`${name}: ${server.url} - ${status}`)
       } else if (!server.type || server.type === 'stdio') {
-        const args = Array.isArray(server.args) ? server.args : []
+        const stdioServer = server as { command: string; args: string[]; type?: string }
+        const args = Array.isArray(stdioServer.args) ? stdioServer.args : []
         // biome-ignore lint/suspicious/noConsole:: intentional console output
-        console.log(`${name}: ${server.command} ${args.join(' ')} - ${status}`)
+        console.log(`${name}: ${stdioServer.command} ${args.join(' ')} - ${status}`)
       }
     }
   }

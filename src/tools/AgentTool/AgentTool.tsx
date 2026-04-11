@@ -2,6 +2,7 @@ import { feature } from 'bun:bundle'
 import * as React from 'react'
 import { buildTool, type ToolDef, toolMatchesName } from 'src/Tool.js'
 import type {
+  AssistantMessage,
   Message as MessageType,
   NormalizedUserMessage,
 } from 'src/types/message.js'
@@ -44,10 +45,11 @@ import {
   formatPreconditionError,
   getRemoteTaskSessionUrl,
   registerRemoteAgentTask,
+  type BackgroundRemoteSessionPrecondition,
 } from '../../tasks/RemoteAgentTask/RemoteAgentTask.js'
 import { assembleToolPool } from '../../tools.js'
 import { asAgentId } from '../../types/ids.js'
-import { runWithAgentContext } from '../../utils/agentContext.js'
+import { runWithAgentContext, type SubagentContext } from '../../utils/agentContext.js'
 import { isAgentSwarmsEnabled } from '../../utils/agentSwarmsEnabled.js'
 import { getCwd, runWithCwdOverride } from '../../utils/cwd.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -456,7 +458,7 @@ export const AgentTool = buildTool({
           plan_mode_required: spawnMode === 'plan',
           model: model ?? agentDef?.model,
           agent_type: subagent_type,
-          invokingRequestId: assistantMessage?.requestId,
+          invokingRequestId: assistantMessage?.requestId as string | undefined,
         },
         toolUseContext,
       )
@@ -667,7 +669,7 @@ export const AgentTool = buildTool({
     if (process.env.USER_TYPE === 'ant' && effectiveIsolation === 'remote') {
       const eligibility = await checkRemoteAgentEligibility()
       if (!eligibility.eligible) {
-        const reasons = eligibility.errors
+        const reasons = (eligibility as { eligible: false; errors: BackgroundRemoteSessionPrecondition[] }).errors
           .map(formatPreconditionError)
           .join('\n')
         throw new Error(`Cannot launch remote agent:\n${reasons}`)
@@ -978,7 +980,7 @@ export const AgentTool = buildTool({
       }
 
       // Wrap async agent execution in agent context for analytics attribution
-      const asyncAgentContext = {
+      const asyncAgentContext: SubagentContext = {
         agentId: asyncAgentId,
         // For subagents from teammates: use team lead's session
         // For subagents from main REPL: undefined (no parent session)
@@ -986,7 +988,7 @@ export const AgentTool = buildTool({
         agentType: 'subagent' as const,
         subagentName: selectedAgent.agentType,
         isBuiltIn: isBuiltInAgent(selectedAgent),
-        invokingRequestId: assistantMessage?.requestId,
+        invokingRequestId: assistantMessage?.requestId as string | undefined,
         invocationKind: 'spawn' as const,
         invocationEmitted: false,
       }
@@ -1046,7 +1048,7 @@ export const AgentTool = buildTool({
       const syncAgentId = asAgentId(earlyAgentId)
 
       // Set up agent context for sync execution (for analytics attribution)
-      const syncAgentContext = {
+      const syncAgentContext: SubagentContext = {
         agentId: syncAgentId,
         // For subagents from teammates: use team lead's session
         // For subagents from main REPL: undefined (no parent session)
@@ -1054,7 +1056,7 @@ export const AgentTool = buildTool({
         agentType: 'subagent' as const,
         subagentName: selectedAgent.agentType,
         isBuiltIn: isBuiltInAgent(selectedAgent),
-        invokingRequestId: assistantMessage?.requestId,
+        invokingRequestId: assistantMessage?.requestId as string | undefined,
         invocationKind: 'spawn' as const,
         invocationEmitted: false,
       }
@@ -1417,7 +1419,7 @@ export const AgentTool = buildTool({
               }
               const { result } = raceResult
               if (result.done) break
-              const message = result.value
+              const message = result.value as MessageType
 
               agentMessages.push(message)
 
@@ -1456,12 +1458,12 @@ export const AgentTool = buildTool({
               // receives tool_progress events just as it does for the main agent.
               if (
                 message.type === 'progress' &&
-                (message.data.type === 'bash_progress' ||
-                  message.data.type === 'powershell_progress') &&
+                ((message.data as { type: string })?.type === 'bash_progress' ||
+                  (message.data as { type: string })?.type === 'powershell_progress') &&
                 onProgress
               ) {
                 onProgress({
-                  toolUseID: message.toolUseID,
+                  toolUseID: message.toolUseID as string,
                   data: message.data,
                 })
               }
@@ -1474,7 +1476,7 @@ export const AgentTool = buildTool({
               // Subagent streaming events are filtered out in runAgent.ts, so we
               // need to count tokens from completed messages here
               if (message.type === 'assistant') {
-                const contentLength = getAssistantMessageContentLength(message)
+                const contentLength = getAssistantMessageContentLength(message as AssistantMessage)
                 if (contentLength > 0) {
                   toolUseContext.setResponseLength(len => len + contentLength)
                 }
@@ -1482,7 +1484,7 @@ export const AgentTool = buildTool({
 
               const normalizedNew = normalizeMessages([message])
               for (const m of normalizedNew) {
-                for (const content of m.message.content) {
+                for (const content of (m.message?.content ?? []) as readonly { readonly type: string }[]) {
                   if (
                     content.type !== 'tool_use' &&
                     content.type !== 'tool_result'

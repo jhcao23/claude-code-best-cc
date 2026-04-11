@@ -1,6 +1,5 @@
 import React from 'react'
-import { stringWidth } from '../ink/stringWidth.js'
-import { Box, Text } from '../ink.js'
+import { Box, Text, stringWidth } from '@anthropic/ink'
 import type { NormalizedMessage } from '../types/message.js'
 
 type Props = {
@@ -16,13 +15,13 @@ export function MessageTimestamp({
     isTranscriptMode &&
     message.timestamp &&
     message.type === 'assistant' &&
-    message.message.content.some(c => c.type === 'text')
+    (Array.isArray(message.message!.content) ? (message.message!.content as {type: string}[]).some(c => c.type === 'text') : false)
 
   if (!shouldShowTimestamp) {
     return null
   }
 
-  const formattedTimestamp = new Date(message.timestamp).toLocaleTimeString(
+  const formattedTimestamp = new Date(message.timestamp as string | number | Date).toLocaleTimeString(
     'en-US',
     {
       hour: '2-digit',

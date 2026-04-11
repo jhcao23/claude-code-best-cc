@@ -8,7 +8,7 @@ import {
   shouldOfferTerminalSetup,
 } from '../commands/terminalSetup/terminalSetup.js'
 import { useExitOnCtrlCDWithKeybindings } from '../hooks/useExitOnCtrlCDWithKeybindings.js'
-import { Box, Link, Newline, Text, useTheme } from '../ink.js'
+import { Box, Link, Newline, Text, useTheme } from '@anthropic/ink'
 import { useKeybindings } from '../keybindings/useKeybinding.js'
 import { isAnthropicAuthEnabled } from '../utils/auth.js'
 import { normalizeApiKeyForConfig } from '../utils/authPortable.js'
@@ -148,9 +148,10 @@ export function Onboarding({ onDone }: Props): React.ReactNode {
   }
 
   const steps: OnboardingStep[] = []
-  if (oauthEnabled) {
-    steps.push({ id: 'preflight', component: preflightStep })
-  }
+  // Preflight check disabled — users may use third-party API providers
+  // if (oauthEnabled) {
+  //   steps.push({ id: 'preflight', component: preflightStep })
+  // }
   steps.push({ id: 'theme', component: themeStep })
 
   if (apiKeyNeedingApproval) {

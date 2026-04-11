@@ -9,9 +9,9 @@ import { getIsRemoteMode } from '../bootstrap/state.js'
 import type { Command } from '../commands.js'
 import { BLACK_CIRCLE } from '../constants/figures.js'
 import { useTerminalSize } from '../hooks/useTerminalSize.js'
-import type { ScrollBoxHandle } from '../ink/components/ScrollBox.js'
-import { useTerminalNotification } from '../ink/useTerminalNotification.js'
-import { Box, Text } from '../ink.js'
+import type { ScrollBoxHandle } from '@anthropic/ink'
+import { useTerminalNotification } from '@anthropic/ink'
+import { Box, Text } from '@anthropic/ink'
 import { useShortcutDisplay } from '../keybindings/useShortcutDisplay.js'
 import type { Screen } from '../screens/REPL.js'
 import type { Tools } from '../Tool.js'
@@ -49,7 +49,7 @@ import {
 } from '../utils/messages.js'
 import { plural } from '../utils/stringUtils.js'
 import { renderableSearchText } from '../utils/transcriptSearch.js'
-import { Divider } from './design-system/Divider.js'
+import { Divider } from '@anthropic/ink'
 import type { UnseenDivider } from './FullscreenLayout.js'
 import { LogoV2 } from './LogoV2/LogoV2.js'
 import { StreamingMarkdown } from './Markdown.js'
@@ -291,13 +291,13 @@ type Props = {
   /** Paint an existing DOM subtree to fresh Screen, scan. Element comes
    *  from the main tree (all real providers). Message-relative positions. */
   scanElement?: (
-    el: import('../ink/dom.js').DOMElement,
-  ) => import('../ink/render-to-screen.js').MatchPosition[]
+    el: import('@anthropic/ink').DOMElement,
+  ) => import('@anthropic/ink').MatchPosition[]
   /** Position-based CURRENT highlight. positions stable (msg-relative),
    *  rowOffset tracks scroll. null clears. */
   setPositions?: (
     state: {
-      positions: import('../ink/render-to-screen.js').MatchPosition[]
+      positions: import('@anthropic/ink').MatchPosition[]
       rowOffset: number
       currentIdx: number
     } | null,
@@ -460,7 +460,7 @@ const MessagesImpl = ({
     for (let i = normalizedMessages.length - 1; i >= 0; i--) {
       const msg = normalizedMessages[i]
       if (msg?.type === 'assistant') {
-        const content = msg.message.content
+        const content = msg.message!.content as Array<{ type: string }>
         // Find the last thinking block in this message
         for (let j = content.length - 1; j >= 0; j--) {
           if (content[j]?.type === 'thinking') {
@@ -468,7 +468,8 @@ const MessagesImpl = ({
           }
         }
       } else if (msg?.type === 'user') {
-        const hasToolResult = msg.message.content.some(
+        const content = msg.message!.content as Array<{ type: string }>
+        const hasToolResult = content.some(
           block => block.type === 'tool_result',
         )
         if (!hasToolResult) {
@@ -487,11 +488,11 @@ const MessagesImpl = ({
     for (let i = normalizedMessages.length - 1; i >= 0; i--) {
       const msg = normalizedMessages[i]
       if (msg?.type === 'user') {
-        const content = msg.message.content
+        const content = msg.message!.content as Array<{ type: string; text?: string }>
         // Check if any text content is bash output
         for (const block of content) {
           if (block.type === 'text') {
-            const text = block.text
+            const text = block.text ?? ''
             if (
               text.startsWith('<bash-stdout') ||
               text.startsWith('<bash-stderr')
@@ -594,7 +595,7 @@ const MessagesImpl = ({
           // BEFORE counting/slicing so they don't inflate the "N messages"
           // count in ctrl-o or consume slots in the 200-message render cap.
           .filter(msg => !isNullRenderingAttachment(msg))
-          .filter(_ => shouldShowUserMessage(_, isTranscriptMode)),
+          .filter(_ => shouldShowUserMessage(_, isTranscriptMode)) as Parameters<typeof reorderMessagesInUI>[0],
         syntheticStreamingToolUseMessages,
       )
       // Three-tier filtering. Transcript mode (ctrl+o screen) is truly unfiltered.
@@ -613,10 +614,10 @@ const MessagesImpl = ({
       const briefFiltered =
         briefToolNames.length > 0 && !isTranscriptMode
           ? isBriefOnly
-            ? filterForBriefTool(messagesToShowNotTruncated, briefToolNames)
+            ? filterForBriefTool(messagesToShowNotTruncated as Parameters<typeof filterForBriefTool>[0], briefToolNames)
             : dropTextToolNames.length > 0
               ? dropTextInBriefTurns(
-                  messagesToShowNotTruncated,
+                  messagesToShowNotTruncated as Parameters<typeof dropTextInBriefTurns>[0],
                   dropTextToolNames,
                 )
               : messagesToShowNotTruncated
@@ -631,7 +632,7 @@ const MessagesImpl = ({
         briefFiltered.length > MAX_MESSAGES_TO_SHOW_IN_TRANSCRIPT_MODE
 
       const { messages: groupedMessages } = applyGrouping(
-        messagesToShow,
+        messagesToShow as MessageType[],
         tools,
         verbose,
       )
@@ -645,7 +646,7 @@ const MessagesImpl = ({
         verbose,
       )
 
-      const lookups = buildMessageLookups(normalizedMessages, messagesToShow)
+      const lookups = buildMessageLookups(normalizedMessages, messagesToShow as MessageType[])
 
       const hiddenMessageCount =
         messagesToShowNotTruncated.length -
@@ -740,7 +741,8 @@ const MessagesImpl = ({
     (msg: RenderableMessage): boolean => {
       if (msg.type === 'collapsed_read_search') return true
       if (msg.type === 'assistant') {
-        const b = msg.message.content[0] as unknown as AdvisorBlock | undefined
+        const content = msg.message!.content
+        const b = (Array.isArray(content) ? content[0] : undefined) as unknown as AdvisorBlock | undefined
         return (
           b != null &&
           isAdvisorBlock(b) &&
@@ -749,11 +751,11 @@ const MessagesImpl = ({
         )
       }
       if (msg.type !== 'user') return false
-      const b = msg.message.content[0]
+      const b = (msg.message!.content as Array<{ type: string; tool_use_id?: string; is_error?: boolean; [key: string]: unknown }>)[0]
       if (b?.type !== 'tool_result' || b.is_error || !msg.toolUseResult)
         return false
       const name = lookupsRef.current.toolUseByToolUseID.get(
-        b.tool_use_id,
+        b.tool_use_id ?? '',
       )?.name
       const tool = name ? findToolByName(tools, name) : undefined
       return tool?.isResultTruncated?.(msg.toolUseResult as never) ?? false
@@ -1110,9 +1112,9 @@ export function shouldRenderStatically(
     case 'user':
     case 'assistant': {
       if (message.type === 'assistant') {
-        const block = message.message.content[0]
+        const block = (message.message!.content as Array<{ type: string; id?: string }>)[0]
         if (block?.type === 'server_tool_use') {
-          return lookups.resolvedToolUseIDs.has(block.id)
+          return lookups.resolvedToolUseIDs.has(block.id!)
         }
       }
       const toolUseID = getToolUseID(message)
@@ -1141,10 +1143,10 @@ export function shouldRenderStatically(
     }
     case 'grouped_tool_use': {
       const allResolved = message.messages.every(msg => {
-        const content = msg.message.content[0]
+        const content = (msg.message!.content as Array<{ type: string; id?: string }>)[0]
         return (
           content?.type === 'tool_use' &&
-          lookups.resolvedToolUseIDs.has(content.id)
+          lookups.resolvedToolUseIDs.has(content.id!)
         )
       })
       return allResolved
@@ -1154,5 +1156,7 @@ export function shouldRenderStatically(
       // (In transcript mode, we already returned true at the top of this function)
       return false
     }
+    default:
+      return true
   }
 }

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Text } from '../ink.js'
+import { Text } from '@anthropic/ink'
 import { isClaudeAISubscriber } from '../utils/auth.js'
 import {
   isChromeExtensionInstalled,
@@ -24,7 +24,7 @@ export function useChromeExtensionNotification(): void {
     if (!shouldEnableClaudeInChrome(chromeFlag)) return null
 
     // Claude in Chrome is only supported for claude.ai subscribers (unless user is ant)
-    if ("external" !== 'ant' && !isClaudeAISubscriber()) {
+    if (process.env.USER_TYPE !== 'ant' && !isClaudeAISubscriber()) {
       return {
         key: 'chrome-requires-subscription',
         jsx: (

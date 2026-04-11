@@ -1,9 +1,10 @@
 import * as React from 'react'
-import { Text } from 'src/ink.js'
+import { Text } from '@anthropic/ink'
+import { toInkColor } from '../../utils/ink.js'
 import type { BackgroundTaskState } from 'src/tasks/types.js'
 import type { DeepImmutable } from 'src/types/utils.js'
 import { truncate } from 'src/utils/format.js'
-import { toInkColor } from 'src/utils/ink.js'
+
 import { plural } from 'src/utils/stringUtils.js'
 import { DIAMOND_FILLED, DIAMOND_OPEN } from '../../constants/figures.js'
 import { RemoteSessionProgress } from './RemoteSessionProgress.js'
@@ -78,11 +79,12 @@ export function BackgroundTask({
         </Text>
       )
     }
-    case 'local_workflow':
+    case 'local_workflow': {
+      const _task = task as Record<string, unknown>
       return (
         <Text>
           {truncate(
-            task.workflowName ?? task.summary ?? task.description,
+            ((_task.workflowName as string) ?? task.summary ?? task.description) as string,
             activityLimit,
             true,
           )}{' '}
@@ -90,7 +92,7 @@ export function BackgroundTask({
             status={task.status}
             label={
               task.status === 'running'
-                ? `${task.agentCount} ${plural(task.agentCount, 'agent')}`
+                ? `${_task.agentCount as number} ${plural(_task.agentCount as number, 'agent')}`
                 : task.status === 'completed'
                   ? 'done'
                   : undefined
@@ -103,6 +105,7 @@ export function BackgroundTask({
           />
         </Text>
       )
+    }
     case 'monitor_mcp':
       return (
         <Text>

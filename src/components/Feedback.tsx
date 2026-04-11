@@ -14,7 +14,7 @@ import {
 } from 'src/utils/messages.js'
 import type { CommandResultDisplay } from '../commands.js'
 import { useTerminalSize } from '../hooks/useTerminalSize.js'
-import { Box, Text, useInput } from '../ink.js'
+import { Box, Text, useInput } from '@anthropic/ink'
 import { useKeybinding } from '../keybindings/useKeybinding.js'
 import { queryHaiku } from '../services/api/claude.js'
 import { startsWithApiErrorPrefix } from '../services/api/errors.js'
@@ -36,9 +36,7 @@ import {
 import { jsonStringify } from '../utils/slowOperations.js'
 import { asSystemPrompt } from '../utils/systemPromptType.js'
 import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js'
-import { Byline } from './design-system/Byline.js'
-import { Dialog } from './design-system/Dialog.js'
-import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js'
+import { Byline, Dialog, KeyboardShortcutHint } from '@anthropic/ink'
 import TextInput from './TextInput.js'
 
 // This value was determined experimentally by testing the URL length limit
@@ -254,7 +252,7 @@ export function Feedback({
     }
 
     const [result, t] = await Promise.all([
-      submitFeedback(reportData, abortSignal),
+      submitFeedback(reportData as FeedbackData, abortSignal),
       generateTitle(description, abortSignal),
     ])
 
@@ -615,9 +613,10 @@ async function generateTitle(
       },
     })
 
+    const _firstBlock = response?.message?.content?.[0] as unknown as Record<string, unknown> | undefined
     const title =
-      response.message.content[0]?.type === 'text'
-        ? response.message.content[0].text
+      _firstBlock?.type === 'text'
+        ? (_firstBlock.text as string)
         : 'Bug Report'
 
     // Check if the title contains an API error message

@@ -29,8 +29,7 @@ import {
 } from '../../../bootstrap/state.js'
 import { generateSessionName } from '../../../commands/rename/generateSessionName.js'
 import { launchUltraplan } from '../../../commands/ultraplan.js'
-import type { KeyboardEvent } from '../../../ink/events/keyboard-event.js'
-import { Box, Text } from '../../../ink.js'
+import { type KeyboardEvent, Box, Text } from '@anthropic/ink'
 import type { AppState } from '../../../state/AppStateStore.js'
 import { AGENT_TOOL_NAME } from '../../../tools/AgentTool/constants.js'
 import { EXIT_PLAN_MODE_V2_TOOL_NAME } from '../../../tools/ExitPlanModeTool/constants.js'
@@ -236,7 +235,7 @@ export function ExitPlanModePermissionRequest({
         showClearContext,
         showUltraplan,
         usedPercent: showClearContext
-          ? getContextUsedPercent(usage, mode)
+          ? getContextUsedPercent(usage as { input_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }, mode)
           : null,
         isAutoModeAvailable,
         isBypassPermissionsModeAvailable,

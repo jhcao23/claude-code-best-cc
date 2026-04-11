@@ -35,7 +35,7 @@ function hasMemoryFileRead(messages: Message[]): boolean {
     if (message.type !== 'assistant') {
       continue
     }
-    const content = message.message.content
+    const content = message.message!.content
     if (!Array.isArray(content)) {
       continue
     }
@@ -249,7 +249,7 @@ export function useMemorySurvey(
       return
     }
 
-    const text = extractTextContent(lastAssistant.message.content, ' ')
+    const text = extractTextContent(Array.isArray(lastAssistant.message.content) ? lastAssistant.message.content : [], ' ')
     if (!MEMORY_WORD_RE.test(text)) {
       return
     }
