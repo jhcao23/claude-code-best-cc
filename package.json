@@ -54,6 +54,7 @@
     "rcs": "bun run scripts/rcs.ts"
   },
   "dependencies": {
+    "@types/he": "^1.2.3"
   },
   "devDependencies": {
     "@langfuse/otel": "^5.1.0",
