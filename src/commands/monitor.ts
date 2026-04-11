@@ -77,7 +77,7 @@ const monitor = {
               command,
               description: command,
               shellCommand,
-              toolUseId: context.toolUseID ?? `monitor-${Date.now()}`,
+              toolUseId: context.toolUseId ?? `monitor-${Date.now()}`,
               agentId: undefined,
               kind: 'monitor',
             },

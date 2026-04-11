@@ -1,5 +1,5 @@
 import React from 'react'
-import { Text } from '../../ink.js'
+import { Text } from '@anthropic/ink'
 import { z } from 'zod/v4'
 import { TOOL_SUMMARY_MAX_LENGTH } from '../../constants/toolLimits.js'
 import type { ToolResultBlockParam, ToolUseContext, ValidationResult } from '../../Tool.js'
@@ -132,7 +132,7 @@ Examples:
     const {
       abortController,
       setAppState,
-      toolUseID,
+      toolUseId,
       agentId,
     } = context
 
@@ -147,7 +147,7 @@ Examples:
         command,
         description,
         shellCommand,
-        toolUseId: toolUseID,
+        toolUseId: toolUseId,
         agentId,
         kind: 'monitor',
       },
@@ -175,10 +175,10 @@ Examples:
 
   mapToolResultToToolResultBlockParam(
     content: MonitorOutput,
-    toolUseID: string,
+    toolUseId: string,
   ): ToolResultBlockParam {
     return {
-      tool_use_id: toolUseID,
+      tool_use_id: toolUseId,
       type: 'tool_result',
       content: `Monitor started (task ${content.taskId}). Output file: ${content.outputFile}`,
     }

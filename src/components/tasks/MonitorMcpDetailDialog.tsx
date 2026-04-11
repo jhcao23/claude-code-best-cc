@@ -1,8 +1,7 @@
 import React from 'react'
 import type { DeepImmutable } from 'src/types/utils.js'
 import { useElapsedTime } from '../../hooks/useElapsedTime.js'
-import type { KeyboardEvent } from '../../ink/events/keyboard-event.js'
-import { Box, Text } from '../../ink.js'
+import { Box, Text, type KeyboardEvent } from '@anthropic/ink'
 import { useKeybindings } from '../../keybindings/useKeybinding.js'
 import type { MonitorMcpTaskState } from '../../tasks/MonitorMcpTask/MonitorMcpTask.js'
 import { Byline } from '../design-system/Byline.js'
@@ -73,11 +72,11 @@ export function MonitorMcpDetailDialog({
           <Text>
             <Text bold>Status:</Text>{' '}
             {task.status === 'running' ? (
-              <Text color="green">running</Text>
+              <Text color="ansi:green">running</Text>
             ) : task.status === 'completed' ? (
-              <Text color="green">{task.status}</Text>
+              <Text color="ansi:green">{task.status}</Text>
             ) : (
-              <Text color="red">{task.status}</Text>
+              <Text color="ansi:red">{task.status}</Text>
             )}
           </Text>
           <Text>

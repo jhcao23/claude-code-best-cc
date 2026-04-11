@@ -28,7 +28,7 @@ export function getPipeRelay(): PipeRelayFn | null {
 }
 
 function getPipeSender():
-  | ((message: PipeMessage) => boolean | undefined)
+  | ((message: PipeMessage) => void)
   | null {
   return _pipeRelay ?? null
 }

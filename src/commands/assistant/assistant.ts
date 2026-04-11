@@ -1,5 +1,22 @@
+import * as React from 'react'
 import type { LocalJSXCommandContext } from '../../commands.js'
 import type { LocalJSXCommandOnDone } from '../../types/command.js'
+import type { AppState } from '../../state/AppState.js'
+
+/** Stub — install wizard is not yet restored. */
+export async function computeDefaultInstallDir(): Promise<string> {
+  return ''
+}
+
+/** Stub — install wizard is not yet restored. */
+export function NewInstallWizard(_props: {
+  defaultDir: string
+  onInstalled: (dir: string) => void
+  onCancel: () => void
+  onError: (message: string) => void
+}): React.ReactNode {
+  return null
+}
 
 /**
  * /assistant command implementation.
@@ -19,16 +36,16 @@ export async function call(
   const isVisible = (current as Record<string, unknown>).assistantPanelVisible
 
   if (isVisible) {
-    setAppState((prev: Record<string, unknown>) => ({
+    setAppState((prev: AppState) => ({
       ...prev,
       assistantPanelVisible: false,
-    }))
+    } as AppState))
     onDone('Assistant panel hidden.', { display: 'system' })
   } else {
-    setAppState((prev: Record<string, unknown>) => ({
+    setAppState((prev: AppState) => ({
       ...prev,
       assistantPanelVisible: true,
-    }))
+    } as AppState))
     onDone('Assistant panel opened.', { display: 'system' })
   }
 

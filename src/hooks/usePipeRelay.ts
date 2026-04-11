@@ -7,14 +7,11 @@
  */
 import { useRef, useCallback } from 'react'
 import { getPipeRelay } from '../utils/pipePermissionRelay.js'
+import type { PipeMessage } from '../utils/pipeTransport.js'
 
 export type PipeRelayHandle = {
   /** Send a relay message to the master. Returns false if no relay is active. */
-  relayPipeMessage: (message: {
-    type: string
-    data?: string
-    meta?: Record<string, unknown>
-  }) => boolean
+  relayPipeMessage: (message: PipeMessage) => boolean
   /** Tracks whether an error was already relayed for this query turn. */
   pipeReturnHadErrorRef: React.MutableRefObject<boolean>
 }
@@ -27,11 +24,7 @@ export function usePipeRelay(): PipeRelayHandle {
   const pipeReturnHadErrorRef = useRef(false)
 
   const relayPipeMessage = useCallback(
-    (message: {
-      type: string
-      data?: string
-      meta?: Record<string, unknown>
-    }): boolean => {
+    (message: PipeMessage): boolean => {
       const relay = getPipeRelay()
       if (typeof relay !== 'function') {
         return false

@@ -1,8 +1,7 @@
 import React, { useCallback } from 'react'
 import type { DeepImmutable } from 'src/types/utils.js'
 import { useElapsedTime } from '../../hooks/useElapsedTime.js'
-import type { KeyboardEvent } from '../../ink/events/keyboard-event.js'
-import { Box, Text } from '../../ink.js'
+import { Box, Text, type KeyboardEvent } from '@anthropic/ink'
 import { useKeybindings } from '../../keybindings/useKeybinding.js'
 import type { LocalWorkflowTaskState } from '../../tasks/LocalWorkflowTask/LocalWorkflowTask.js'
 import { Byline } from '../design-system/Byline.js'
@@ -82,11 +81,11 @@ export function WorkflowDetailDialog({
           <Text>
             <Text bold>Status:</Text>{' '}
             {workflow.status === 'running' ? (
-              <Text color="green">running</Text>
+              <Text color="ansi:green">running</Text>
             ) : workflow.status === 'completed' ? (
-              <Text color="green">{workflow.status}</Text>
+              <Text color="ansi:green">{workflow.status}</Text>
             ) : (
-              <Text color="red">{workflow.status}</Text>
+              <Text color="ansi:red">{workflow.status}</Text>
             )}
           </Text>
           <Text>

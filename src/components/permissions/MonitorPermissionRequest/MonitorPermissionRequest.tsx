@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from 'react'
-import { Box, Text, useTheme } from '../../../ink.js'
+import { Box, Text, useTheme } from '@anthropic/ink'
+import { getTheme } from '../../../utils/theme.js'
 import { env } from '../../../utils/env.js'
 import { shouldShowAlwaysAllowOptions } from '../../../utils/permissions/permissionsLoader.js'
 import { truncateToLines } from '../../../utils/stringUtils.js'
@@ -25,7 +26,8 @@ export function MonitorPermissionRequest({
   onReject,
   workerBadge,
 }: PermissionRequestProps): React.ReactNode {
-  const [theme] = useTheme()
+  const [themeName] = useTheme()
+  const theme = getTheme(themeName)
 
   const input = toolUseConfirm.input as {
     command: string
@@ -73,7 +75,7 @@ export function MonitorPermissionRequest({
             event: 'accept',
             metadata: {
               language_name: 'none',
-              message_id: toolUseConfirm.assistantMessage.message.id,
+              message_id: toolUseConfirm.assistantMessage.message.id ?? '',
               platform: env.platform,
             },
           })
@@ -86,7 +88,7 @@ export function MonitorPermissionRequest({
             event: 'accept',
             metadata: {
               language_name: 'none',
-              message_id: toolUseConfirm.assistantMessage.message.id,
+              message_id: toolUseConfirm.assistantMessage.message.id ?? '',
               platform: env.platform,
             },
           })
@@ -106,7 +108,7 @@ export function MonitorPermissionRequest({
             event: 'reject',
             metadata: {
               language_name: 'none',
-              message_id: toolUseConfirm.assistantMessage.message.id,
+              message_id: toolUseConfirm.assistantMessage.message.id ?? '',
               platform: env.platform,
             },
           })
@@ -125,7 +127,7 @@ export function MonitorPermissionRequest({
       event: 'reject',
       metadata: {
         language_name: 'none',
-        message_id: toolUseConfirm.assistantMessage.message.id,
+        message_id: toolUseConfirm.assistantMessage.message.id ?? '',
         platform: env.platform,
       },
     })
@@ -141,7 +143,7 @@ export function MonitorPermissionRequest({
     >
       <Box flexDirection="column" gap={1}>
         <Box flexDirection="column">
-          <Text bold color={theme.permission}>
+          <Text bold color={theme.permission as any}>
             {input.description}
           </Text>
           <Text dimColor>

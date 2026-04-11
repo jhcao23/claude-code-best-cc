@@ -19,6 +19,14 @@ mock.module('dgram', () => ({
 
 const { LanBeacon } = await import('../lanBeacon.js')
 
+type MockCall = [string, ...unknown[]]
+
+function getMessageHandler(): ((msg: Buffer, rinfo: { address: string; port: number }) => void) | undefined {
+  const calls = mockSocket.on.mock.calls as unknown as MockCall[]
+  const call = calls.find(c => c[0] === 'message')
+  return call?.[1] as ((msg: Buffer, rinfo: { address: string; port: number }) => void) | undefined
+}
+
 describe('LanBeacon', () => {
   let beacon: InstanceType<typeof LanBeacon>
 
@@ -71,93 +79,84 @@ describe('LanBeacon', () => {
   test('processes incoming announce from different peer', () => {
     beacon.start()
 
-    // Simulate receiving an announce packet
-    const messageHandler = mockSocket.on.mock.calls.find(
-      (call: any[]) => call[0] === 'message',
-    )?.[1]
+    const messageHandler = getMessageHandler()
+    if (!messageHandler) return
 
-    if (messageHandler) {
-      const peerAnnounce = JSON.stringify({
-        proto: 'claude-pipe-v1',
-        pipeName: 'cli-peer5678',
-        machineId: 'machine-xyz',
-        hostname: 'peer-host',
-        ip: '192.168.1.20',
-        tcpPort: 7102,
-        role: 'sub',
-        ts: Date.now(),
-      })
+    const peerAnnounce = JSON.stringify({
+      proto: 'claude-pipe-v1',
+      pipeName: 'cli-peer5678',
+      machineId: 'machine-xyz',
+      hostname: 'peer-host',
+      ip: '192.168.1.20',
+      tcpPort: 7102,
+      role: 'sub',
+      ts: Date.now(),
+    })
 
-      let discoveredPeer: any = null
-      beacon.on('peer-discovered', (peer: any) => {
-        discoveredPeer = peer
-      })
+    let discoveredPeer: any = null
+    beacon.on('peer-discovered', (peer: any) => {
+      discoveredPeer = peer
+    })
 
-      messageHandler(Buffer.from(peerAnnounce), {
-        address: '192.168.1.20',
-        port: 7101,
-      })
+    messageHandler(Buffer.from(peerAnnounce), {
+      address: '192.168.1.20',
+      port: 7101,
+    })
 
-      expect(beacon.getPeers().size).toBe(1)
-      expect(beacon.getPeers().has('cli-peer5678')).toBe(true)
-      expect(discoveredPeer).not.toBeNull()
-      expect(discoveredPeer.pipeName).toBe('cli-peer5678')
-    }
+    expect(beacon.getPeers().size).toBe(1)
+    expect(beacon.getPeers().has('cli-peer5678')).toBe(true)
+    expect(discoveredPeer).not.toBeNull()
+    expect(discoveredPeer.pipeName).toBe('cli-peer5678')
   })
 
   test('ignores self-announces', () => {
     beacon.start()
 
-    const messageHandler = mockSocket.on.mock.calls.find(
-      (call: any[]) => call[0] === 'message',
-    )?.[1]
+    const messageHandler = getMessageHandler()
+    if (!messageHandler) return
 
-    if (messageHandler) {
-      const selfAnnounce = JSON.stringify({
-        proto: 'claude-pipe-v1',
-        pipeName: 'cli-test1234', // same as our pipeName
-        machineId: 'machine-abc',
-        hostname: 'test-host',
-        ip: '192.168.1.10',
-        tcpPort: 7100,
-        role: 'main',
-        ts: Date.now(),
-      })
+    const selfAnnounce = JSON.stringify({
+      proto: 'claude-pipe-v1',
+      pipeName: 'cli-test1234', // same as our pipeName
+      machineId: 'machine-abc',
+      hostname: 'test-host',
+      ip: '192.168.1.10',
+      tcpPort: 7100,
+      role: 'main',
+      ts: Date.now(),
+    })
 
-      messageHandler(Buffer.from(selfAnnounce), {
-        address: '192.168.1.10',
-        port: 7101,
-      })
-      expect(beacon.getPeers().size).toBe(0)
-    }
+    messageHandler(Buffer.from(selfAnnounce), {
+      address: '192.168.1.10',
+      port: 7101,
+    })
+    expect(beacon.getPeers().size).toBe(0)
   })
 
   test('ignores non-claude-pipe protocol messages', () => {
     beacon.start()
 
-    const messageHandler = mockSocket.on.mock.calls.find(
-      (call: any[]) => call[0] === 'message',
-    )?.[1]
+    const messageHandler = getMessageHandler()
+    if (!messageHandler) return
 
-    if (messageHandler) {
-      const foreignMessage = JSON.stringify({
-        proto: 'something-else',
-        pipeName: 'cli-foreign',
-      })
+    const foreignMessage = JSON.stringify({
+      proto: 'something-else',
+      pipeName: 'cli-foreign',
+    })
 
-      messageHandler(Buffer.from(foreignMessage), {
-        address: '192.168.1.30',
-        port: 7101,
-      })
-      expect(beacon.getPeers().size).toBe(0)
-    }
+    messageHandler(Buffer.from(foreignMessage), {
+      address: '192.168.1.30',
+      port: 7101,
+    })
+    expect(beacon.getPeers().size).toBe(0)
   })
 
   test('updateAnnounce changes role', () => {
     beacon.updateAnnounce({ role: 'sub' })
     beacon.start()
     // The send call should include the updated role
-    const sendCall = mockSocket.send.mock.calls[0]
+    const sendCalls = mockSocket.send.mock.calls as unknown as [Buffer, ...unknown[]][]
+    const sendCall = sendCalls[0]
     if (sendCall) {
       const payload = JSON.parse(sendCall[0].toString())
       expect(payload.role).toBe('sub')

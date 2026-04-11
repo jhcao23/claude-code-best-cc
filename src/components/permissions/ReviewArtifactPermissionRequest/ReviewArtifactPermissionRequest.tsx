@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, Text } from '../../../ink.js'
+import { Box, Text } from '@anthropic/ink'
 import { Select } from '../../CustomSelect/select.js'
 import { usePermissionRequestLogging } from '../hooks.js'
 import { PermissionDialog } from '../PermissionDialog.js'

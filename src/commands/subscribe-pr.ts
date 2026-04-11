@@ -74,7 +74,7 @@ async function parsePRArg(
           'Could not detect the GitHub repository for the current directory. Provide a full PR URL instead.',
       }
     }
-    const repo = `${detected.owner}/${detected.repo}`
+    const repo = `${detected.owner}/${detected.name}`
     return { repo, prNumber }
   }
 

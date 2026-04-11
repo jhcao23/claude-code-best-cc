@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from 'react'
-import { Box, Text, useTheme } from '../../ink.js'
+import { Box, Text, useTheme } from '@anthropic/ink'
+import { getTheme } from '../../utils/theme.js'
 import { env } from '../../utils/env.js'
 import { shouldShowAlwaysAllowOptions } from '../../utils/permissions/permissionsLoader.js'
 import { logUnaryEvent } from '../../utils/unaryLogging.js'
@@ -24,7 +25,8 @@ export function WorkflowPermissionRequest({
   onReject,
   workerBadge,
 }: PermissionRequestProps): React.ReactNode {
-  const [theme] = useTheme()
+  const [themeName] = useTheme()
+  const theme = getTheme(themeName)
 
   const input = toolUseConfirm.input as {
     workflow: string
@@ -72,7 +74,7 @@ export function WorkflowPermissionRequest({
             event: 'accept',
             metadata: {
               language_name: 'none',
-              message_id: toolUseConfirm.assistantMessage.message.id,
+              message_id: toolUseConfirm.assistantMessage.message.id ?? '',
               platform: env.platform,
             },
           })
@@ -85,7 +87,7 @@ export function WorkflowPermissionRequest({
             event: 'accept',
             metadata: {
               language_name: 'none',
-              message_id: toolUseConfirm.assistantMessage.message.id,
+              message_id: toolUseConfirm.assistantMessage.message.id ?? '',
               platform: env.platform,
             },
           })
@@ -105,7 +107,7 @@ export function WorkflowPermissionRequest({
             event: 'reject',
             metadata: {
               language_name: 'none',
-              message_id: toolUseConfirm.assistantMessage.message.id,
+              message_id: toolUseConfirm.assistantMessage.message.id ?? '',
               platform: env.platform,
             },
           })
@@ -124,7 +126,7 @@ export function WorkflowPermissionRequest({
       event: 'reject',
       metadata: {
         language_name: 'none',
-        message_id: toolUseConfirm.assistantMessage.message.id,
+        message_id: toolUseConfirm.assistantMessage.message.id ?? '',
         platform: env.platform,
       },
     })
@@ -140,7 +142,7 @@ export function WorkflowPermissionRequest({
     >
       <Box flexDirection="column" gap={1}>
         <Box flexDirection="column">
-          <Text bold color={theme.permission}>
+          <Text bold color={theme.permission as any}>
             Execute workflow: {input.workflow}
           </Text>
           {input.args && (
