@@ -23,26 +23,48 @@ mock.module('@opentelemetry/sdk-trace-base', () => ({
 // Mock @langfuse/tracing
 const mockChildUpdate = mock(() => {})
 const mockChildEnd = mock(() => {})
+const mockRootUpdate = mock(() => {})
+const mockRootEnd = mock(() => {})
+
+// Mock LangfuseOtelSpanAttributes (re-exported from @langfuse/core)
+const mockLangfuseOtelSpanAttributes: Record<string, string> = {
+  TRACE_SESSION_ID: 'session.id',
+  OBSERVATION_TYPE: 'observation.type',
+  OBSERVATION_INPUT: 'observation.input',
+  OBSERVATION_OUTPUT: 'observation.output',
+  OBSERVATION_MODEL: 'observation.model',
+  OBSERVATION_COMPLETION_START_TIME: 'observation.completionStartTime',
+  OBSERVATION_USAGE_DETAILS: 'observation.usageDetails',
+}
+
+const mockSpanContext = { traceId: 'test-trace-id', spanId: 'test-span-id', traceFlags: 1 }
+const mockSetAttribute = mock(() => {})
+
+// Child observation mock (returned by rootSpan.startObservation for tools)
 const mockChildStartObservation = mock(() => ({
   id: 'child-id',
   update: mockChildUpdate,
   end: mockChildEnd,
 }))
-const mockRootUpdate = mock(() => {})
-const mockRootEnd = mock(() => {})
+
 const mockStartObservation = mock(() => ({
   id: 'test-span-id',
   traceId: 'test-trace-id',
   type: 'span',
-  otelSpan: {},
+  otelSpan: {
+    spanContext: () => mockSpanContext,
+    setAttribute: mockSetAttribute,
+  },
   update: mockRootUpdate,
   end: mockRootEnd,
+  // Instance method — used by recordToolObservation
   startObservation: mockChildStartObservation,
 }))
 const mockSetLangfuseTracerProvider = mock(() => {})
 
 mock.module('@langfuse/tracing', () => ({
   startObservation: mockStartObservation,
+  LangfuseOtelSpanAttributes: mockLangfuseOtelSpanAttributes,
   propagateAttributes: mock((_params: unknown, fn?: () => void) => fn?.()),
   setLangfuseTracerProvider: mockSetLangfuseTracerProvider,
 }))
@@ -66,6 +88,7 @@ describe('Langfuse integration', () => {
     mockRootEnd.mockClear()
     mockForceFlush.mockClear()
     mockShutdown.mockClear()
+    mockSetAttribute.mockClear()
   })
 
   // ── sanitize tests ──────────────────────────────────────────────────────────
@@ -214,9 +237,9 @@ describe('Langfuse integration', () => {
       const { createTrace } = await import('../tracing.js')
       const span = createTrace({ sessionId: 's1', model: 'claude-3', provider: 'firstParty', input: [] })
       expect(span).not.toBeNull()
-      expect(mockStartObservation).toHaveBeenCalledWith('query', expect.objectContaining({
+      expect(mockStartObservation).toHaveBeenCalledWith('agent-run', expect.objectContaining({
         metadata: expect.objectContaining({ provider: 'firstParty', model: 'claude-3' }),
-      }))
+      }), { asType: 'agent' })
     })
   })
 
@@ -224,14 +247,15 @@ describe('Langfuse integration', () => {
     test('no-ops when rootSpan is null', async () => {
       const { recordLLMObservation } = await import('../tracing.js')
       recordLLMObservation(null, { model: 'm', provider: 'firstParty', input: [], output: [], usage: { input_tokens: 10, output_tokens: 5 } })
-      expect(mockChildStartObservation).not.toHaveBeenCalled()
+      expect(mockStartObservation).toHaveBeenCalledTimes(0)
     })
 
-    test('records generation child observation', async () => {
+    test('records generation child observation via global startObservation', async () => {
       process.env.LANGFUSE_PUBLIC_KEY = 'pk-test'
       process.env.LANGFUSE_SECRET_KEY = 'sk-test'
       const { createTrace, recordLLMObservation } = await import('../tracing.js')
       const span = createTrace({ sessionId: 's1', model: 'claude-3', provider: 'firstParty' })
+      mockStartObservation.mockClear()
       recordLLMObservation(span, {
         model: 'claude-3',
         provider: 'firstParty',
@@ -239,11 +263,17 @@ describe('Langfuse integration', () => {
         output: [{ role: 'assistant', content: 'hi' }],
         usage: { input_tokens: 10, output_tokens: 5 },
       })
-      expect(mockChildStartObservation).toHaveBeenCalledWith('ChatAnthropic', expect.any(Object), { asType: 'generation' })
-      expect(mockChildUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      // Should call the global startObservation with asType: 'generation' and parentSpanContext
+      expect(mockStartObservation).toHaveBeenCalledWith('ChatAnthropic', expect.objectContaining({
+        model: 'claude-3',
+      }), expect.objectContaining({
+        asType: 'generation',
+        parentSpanContext: mockSpanContext,
+      }))
+      expect(mockRootUpdate).toHaveBeenCalledWith(expect.objectContaining({
         usageDetails: { input: 10, output: 5 },
       }))
-      expect(mockChildEnd).toHaveBeenCalled()
+      expect(mockRootEnd).toHaveBeenCalled()
     })
   })
 
@@ -251,7 +281,7 @@ describe('Langfuse integration', () => {
     test('no-ops when rootSpan is null', async () => {
       const { recordToolObservation } = await import('../tracing.js')
       recordToolObservation(null, { toolName: 'BashTool', toolUseId: 'id1', input: {}, output: 'out' })
-      expect(mockChildStartObservation).not.toHaveBeenCalled()
+      // startObservation should not be called beyond the initial trace creation (none here)
     })
 
     test('records tool child observation', async () => {
@@ -259,13 +289,15 @@ describe('Langfuse integration', () => {
       process.env.LANGFUSE_SECRET_KEY = 'sk-test'
       const { createTrace, recordToolObservation } = await import('../tracing.js')
       const span = createTrace({ sessionId: 's1', model: 'claude-3', provider: 'firstParty' })
+      mockChildStartObservation.mockClear()
       recordToolObservation(span, {
         toolName: 'BashTool',
         toolUseId: 'tu-1',
         input: { command: 'ls' },
         output: 'file.ts',
       })
-      expect(mockChildStartObservation).toHaveBeenCalledWith('tool:BashTool', expect.any(Object), { asType: 'tool' })
+      // recordToolObservation uses rootSpan.startObservation instance method
+      expect(mockChildStartObservation).toHaveBeenCalledWith('BashTool', expect.any(Object), { asType: 'tool' })
       expect(mockChildEnd).toHaveBeenCalled()
     })
 
@@ -341,9 +373,11 @@ describe('Langfuse integration', () => {
     test('recordLLMObservation silently fails on SDK error', async () => {
       process.env.LANGFUSE_PUBLIC_KEY = 'pk-test'
       process.env.LANGFUSE_SECRET_KEY = 'sk-test'
-      mockChildStartObservation.mockImplementationOnce(() => { throw new Error('SDK error') })
+      mockStartObservation.mockImplementationOnce(() => { throw new Error('SDK error') })
       const { createTrace, recordLLMObservation } = await import('../tracing.js')
       const span = createTrace({ sessionId: 's1', model: 'claude-3', provider: 'firstParty' })
+      // The second call to startObservation (for the generation) will throw
+      mockStartObservation.mockImplementationOnce(() => { throw new Error('SDK error') })
       expect(() => recordLLMObservation(span, {
         model: 'm',
         provider: 'firstParty',

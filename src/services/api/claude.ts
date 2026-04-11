@@ -2909,6 +2909,7 @@ async function* queryModel(
     output: convertOutputToLangfuse(newMessages),
     usage: { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens },
     startTime: new Date(startIncludingRetries),
+    endTime: new Date(),
     completionStartTime: ttftMs > 0 ? new Date(start + ttftMs) : undefined,
   })
 

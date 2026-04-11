@@ -54,13 +54,18 @@ export function recordLLMObservation(
     output: unknown
     usage: { input_tokens: number; output_tokens: number }
     startTime?: Date
+    endTime?: Date
     completionStartTime?: Date
   },
 ): void {
   if (!rootSpan || !isLangfuseEnabled()) return
   try {
     const genName = PROVIDER_GENERATION_NAMES[params.provider] ?? `Chat${params.provider}`
-    const gen: LangfuseGeneration = rootSpan.startObservation(
+
+    // Use the global startObservation directly instead of rootSpan.startObservation().
+    // The instance method only forwards asType to the global function and drops startTime,
+    // which causes negative TTFT because the OTel span's start time defaults to "now".
+    const gen: LangfuseGeneration = startObservation(
       genName,
       {
         model: params.model,
@@ -70,6 +75,7 @@ export function recordLLMObservation(
       {
         asType: 'generation',
         ...(params.startTime && { startTime: params.startTime }),
+        parentSpanContext: rootSpan.otelSpan.spanContext(),
       },
     )
 
@@ -87,7 +93,7 @@ export function recordLLMObservation(
       },
     })
 
-    gen.end()
+    gen.end(params.endTime)
     logForDebugging(`[langfuse] LLM observation recorded: ${gen.id}`)
   } catch (e) {
     logForDebugging(`[langfuse] recordLLMObservation failed: ${e}`, { level: 'error' })
