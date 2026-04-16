@@ -1,5 +1,16 @@
 {
     "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "jsx": "react-jsx",
+        "strict": true,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "resolveJsonModule": true,
+        "types": ["bun", "@types/node"],
         "paths": {
             "src/*": ["./src/*"],
             "@claude-code-best/builtin-tools/*": ["./packages/builtin-tools/src/*"],
