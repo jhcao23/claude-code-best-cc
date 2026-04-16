@@ -1,10 +1,13 @@
 {
-    "extends": "./tsconfig.base.json",
     "compilerOptions": {
         "paths": {
             "src/*": ["./src/*"],
             "@claude-code-best/builtin-tools/*": ["./packages/builtin-tools/src/*"],
-            "@claude-code-best/builtin-tools": ["./packages/builtin-tools/src/index.ts"]
+            "@claude-code-best/builtin-tools": ["./packages/builtin-tools/src/index.ts"],
+            "@claude-code-best/mcp-client/*": ["./packages/mcp-client/src/*"],
+            "@claude-code-best/mcp-client": ["./packages/mcp-client/src/index.ts"],
+            "@claude-code-best/agent-tools/*": ["./packages/agent-tools/src/*"],
+            "@claude-code-best/agent-tools": ["./packages/agent-tools/src/index.ts"]
         }
     },
     "include": ["src/**/*.ts", "src/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx"],
