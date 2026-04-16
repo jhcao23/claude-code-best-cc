@@ -19,6 +19,7 @@
         "@anthropic-ai/claude-agent-sdk": "^0.2.87",
         "@anthropic-ai/foundry-sdk": "^0.2.3",
         "@anthropic-ai/mcpb": "^2.1.2",
+        "@anthropic-ai/model-provider": "workspace:*",
         "@anthropic-ai/sandbox-runtime": "^0.0.44",
         "@anthropic-ai/sdk": "^0.80.0",
         "@anthropic-ai/vertex-sdk": "^0.14.4",
@@ -183,6 +184,14 @@
         "wrap-ansi": "^10.0.0",
       },
     },
+    "packages/@anthropic-ai/model-provider": {
+      "name": "@anthropic-ai/model-provider",
+      "version": "1.0.0",
+      "dependencies": {
+        "@anthropic-ai/sdk": "^0.80.0",
+        "openai": "^6.33.0",
+      },
+    },
     "packages/agent-tools": {
       "name": "@claude-code-best/agent-tools",
       "version": "1.0.0",
@@ -276,6 +285,8 @@
     "@anthropic-ai/foundry-sdk": ["@anthropic-ai/foundry-sdk@0.2.3", "https://registry.npmmirror.com/@anthropic-ai/foundry-sdk/-/foundry-sdk-0.2.3.tgz", { "dependencies": { "@anthropic-ai/sdk": ">=0.50.3 <1" } }, "sha512-pD5yYnAeem5s8wDLbdf8/N8CejF/edRd9TJV+0PrT9tLKv6ggQimnr7d05pQn6FrIYACPmty9hekCo2JgepP0w=="],
 
     "@anthropic-ai/mcpb": ["@anthropic-ai/mcpb@2.1.2", "https://registry.npmmirror.com/@anthropic-ai/mcpb/-/mcpb-2.1.2.tgz", { "dependencies": { "@inquirer/prompts": "^6.0.1", "commander": "^13.1.0", "fflate": "^0.8.2", "galactus": "^1.0.0", "ignore": "^7.0.5", "node-forge": "^1.3.2", "pretty-bytes": "^5.6.0", "zod": "^3.25.67", "zod-to-json-schema": "^3.24.6" }, "bin": { "mcpb": "dist/cli/cli.js" } }, "sha512-goRbBC8ySo7SWb7tRzr+tL6FxDc4JPTRCdgfD2omba7freofvjq5rom1lBnYHZHo6Mizs1jAHJeN53aZbDoy8A=="],
+
+    "@anthropic-ai/model-provider": ["@anthropic-ai/model-provider@workspace:packages/@anthropic-ai/model-provider"],
 
     "@anthropic-ai/sandbox-runtime": ["@anthropic-ai/sandbox-runtime@0.0.44", "https://registry.npmmirror.com/@anthropic-ai/sandbox-runtime/-/sandbox-runtime-0.0.44.tgz", { "dependencies": { "@pondwader/socks5-server": "^1.0.10", "@types/lodash-es": "^4.17.12", "commander": "^12.1.0", "lodash-es": "^4.17.23", "shell-quote": "^1.8.3", "zod": "^3.24.1" }, "bin": { "srt": "dist/cli.js" } }, "sha512-mmyjq0mzsHnQZyiU+FGYyaiJcPckuQpP78VB8iqFi2IOu8rcb9i5SmaOKyJENJNfY8l/1grzLMQgWq4Apvmozw=="],
 
