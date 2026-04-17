@@ -77,6 +77,8 @@ console.log(`[RCS] Remote Control Server starting on ${host}:${port}`);
 console.log("[RCS] API key configuration loaded");
 console.log(`[RCS] Base URL: ${config.baseUrl || `http://localhost:${port}`}`);
 console.log(`[RCS] Disconnect timeout: ${config.disconnectTimeout}s`);
+console.log(`[RCS] WebSocket idle timeout: ${config.wsIdleTimeout}s (protocol-level pings)`);
+console.log(`[RCS] WebSocket keepalive interval: ${config.wsKeepaliveInterval}s (data frames)`);
 
 // Start disconnect monitor
 startDisconnectMonitor();
@@ -87,9 +89,9 @@ export default {
   fetch: app.fetch,
   websocket: {
     ...websocket,
-    idleTimeout: 255, // WS idle timeout (seconds) — must be inside websocket object
+    idleTimeout: config.wsIdleTimeout, // Bun sends protocol pings after this many seconds of silence
   },
-  idleTimeout: 255, // HTTP server idle timeout (seconds) — needed for long-polling endpoints
+  idleTimeout: config.wsIdleTimeout, // HTTP server idle timeout (seconds)
 };
 
 // Graceful shutdown
