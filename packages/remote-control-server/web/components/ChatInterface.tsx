@@ -59,6 +59,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 interface ChatInterfaceProps {
   client: ACPClient;
+  agentId?: string;
 }
 
 // =============================================================================
@@ -152,7 +153,7 @@ function findToolCallIndex(entries: ThreadEntry[], toolCallId: string): number {
 // ChatInterface Component
 // =============================================================================
 
-export function ChatInterface({ client }: ChatInterfaceProps) {
+export function ChatInterface({ client, agentId }: ChatInterfaceProps) {
   // Flat list of entries (like Zed's entries: Vec<AgentThreadEntry>)
   const [entries, setEntries] = useState<ThreadEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -176,6 +177,8 @@ export function ChatInterface({ client }: ChatInterfaceProps) {
     setSessionReady(false);
   }, []);
 
+  const storageKey = agentId ? `acp_last_session_${agentId}` : null;
+
   const activateSession = useCallback((sessionId: string, options?: { resetEntries?: boolean }) => {
     const shouldResetEntries = options?.resetEntries ?? true;
     if (shouldResetEntries) {
@@ -185,8 +188,12 @@ export function ChatInterface({ client }: ChatInterfaceProps) {
     setActiveSessionId(sessionId);
     setSessionReady(true);
     setSupportsImages(client.supportsImages);
+    // Persist session ID for restoration on remount
+    if (storageKey) {
+      try { localStorage.setItem(storageKey, sessionId); } catch {}
+    }
     console.log("[ChatInterface] Active session:", sessionId, "supportsImages:", client.supportsImages);
-  }, [client]);
+  }, [client, storageKey]);
 
   // =============================================================================
   // Permission Request Handler
@@ -528,8 +535,26 @@ export function ChatInterface({ client }: ChatInterfaceProps) {
       errorTimerRef.current = setTimeout(() => setErrorMessage(null), 5000);
     });
 
-    // Create session
-    client.createSession(undefined, permissionMode);
+    // Restore last session or create a new one
+    const lastSessionId = storageKey ? localStorage.getItem(storageKey) : null;
+    if (lastSessionId && (client.supportsLoadSession || client.supportsResumeSession)) {
+      console.log("[ChatInterface] Restoring session:", lastSessionId);
+      const restore = async () => {
+        try {
+          if (client.supportsLoadSession) {
+            await client.loadSession({ sessionId: lastSessionId });
+          } else {
+            await client.resumeSession({ sessionId: lastSessionId });
+          }
+        } catch (err) {
+          console.warn("[ChatInterface] Failed to restore session, creating new one:", err);
+          client.createSession(undefined, permissionMode);
+        }
+      };
+      restore();
+    } else {
+      client.createSession(undefined, permissionMode);
+    }
     return () => {
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
       client.setSessionCreatedHandler(() => {});
@@ -793,7 +818,7 @@ export function ChatInterface({ client }: ChatInterfaceProps) {
 
       {/* Error banner */}
       {errorMessage && (
-        <div className="mx-auto max-w-3xl w-full px-4 pb-1">
+        <div className="mx-auto max-w-3xl w-full px-4 sm:px-8 pb-1">
           <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
             <span>{errorMessage}</span>
             <button
@@ -809,7 +834,7 @@ export function ChatInterface({ client }: ChatInterfaceProps) {
 
       {/* Model selector + New thread + ChatInput */}
       <div className="flex-shrink-0">
-        <div className="max-w-3xl mx-auto w-full px-3 sm:px-4 pb-1 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto w-full px-4 sm:px-8 pb-1 flex items-center justify-between">
           <div className="flex items-center gap-1">
             <PermissionModeSelector mode={permissionMode} onModeChange={(m: string) => { setPermissionMode(m); localStorage.setItem("acp_permission_mode", m); }} />
             <ModelSelectorPopover client={client} />

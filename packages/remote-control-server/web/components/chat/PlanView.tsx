@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { PlanDisplayEntry } from "../../src/lib/types";
 import type { PlanEntry, PlanEntryPriority, PlanEntryStatus } from "../../src/acp/types";
 import { cn } from "../../src/lib/utils";
+import { CheckCircle2, Loader2, Circle } from "lucide-react";
 
 // =============================================================================
 // Plan 展示组件 — 执行计划可视化
@@ -23,7 +24,7 @@ export function PlanDisplay({ entry }: PlanDisplayProps) {
 
   return (
     <div className="pl-10">
-      <div className="rounded-xl border border-border border-l-3 border-l-brand/60 bg-surface-2/50 overflow-hidden">
+      <div className="rounded-xl border border-border bg-brand/5 overflow-hidden">
         {/* Header */}
         <button
           type="button"
@@ -106,25 +107,11 @@ function PlanEntryRow({ entry }: { entry: PlanEntry }) {
 function StatusIcon({ status }: { status: PlanEntryStatus }) {
   switch (status) {
     case "completed":
-      return (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-status-active">
-          <circle cx="7" cy="7" r="6" fill="currentColor" opacity="0.15" />
-          <path d="M4.5 7L6.5 9L9.5 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
+      return <CheckCircle2 className="h-3.5 w-3.5 text-status-active" />;
     case "in_progress":
-      return (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-brand animate-spin" style={{ animationDuration: "2s" }}>
-          <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5" opacity="0.25" />
-          <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      );
+      return <Loader2 className="h-3.5 w-3.5 text-brand animate-spin" style={{ animationDuration: "2s" }} />;
     case "pending":
-      return (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-text-muted">
-          <circle cx="7" cy="7" r="3" fill="currentColor" opacity="0.4" />
-        </svg>
-      );
+      return <Circle className="h-3.5 w-3.5 text-text-muted" />;
   }
 }
 
