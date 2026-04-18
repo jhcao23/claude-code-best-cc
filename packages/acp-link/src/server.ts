@@ -219,7 +219,20 @@ async function handleConnect(ws: WSContext): Promise<void> {
   const state = clients.get(ws);
   if (!state) return;
 
-  // Kill existing process if any
+  // If already connected to a running agent, just resend status
+  // This handles frontend reconnections without restarting the agent process
+  // Check both .killed and .exitCode to detect crashed processes
+  if (state.connection && state.process && !state.process.killed && state.process.exitCode === null) {
+    logAgent.info("already connected, resending status");
+    send(ws, "status", {
+      connected: true,
+      agentInfo: { name: AGENT_COMMAND },
+      capabilities: state.agentCapabilities,
+    });
+    return;
+  }
+
+  // Kill existing process if any (only if not healthy)
   if (state.process) {
     cancelPendingPermissions(state);
     state.process.kill();
@@ -236,6 +249,17 @@ async function handleConnect(ws: WSContext): Promise<void> {
     });
 
     state.process = agentProcess;
+
+    // Clean up state when agent process exits unexpectedly
+    agentProcess.on("exit", (code) => {
+      logAgent.info({ exitCode: code }, "agent process exited");
+      // Only clear if this is still the current process
+      if (state.process === agentProcess) {
+        state.process = null;
+        state.connection = null;
+        state.sessionId = null;
+      }
+    });
 
     const input = Writable.toWeb(agentProcess.stdin!) as unknown as WritableStream<Uint8Array>;
     const output = Readable.toWeb(agentProcess.stdout!) as unknown as ReadableStream<Uint8Array>;
@@ -298,6 +322,7 @@ async function handleNewSession(
 ): Promise<void> {
   const state = clients.get(ws);
   if (!state?.connection) {
+    logAgent.warn({ hasState: !!state, hasProcess: !!state?.process, processKilled: state?.process?.killed, exitCode: state?.process?.exitCode }, "handleNewSession: not connected to agent");
     send(ws, "error", { message: "Not connected to agent" });
     return;
   }
@@ -335,6 +360,7 @@ async function handleListSessions(
 ): Promise<void> {
   const state = clients.get(ws);
   if (!state?.connection) {
+    logAgent.warn({ hasState: !!state, hasProcess: !!state?.process, processKilled: state?.process?.killed, exitCode: state?.process?.exitCode }, "handleListSessions: not connected to agent");
     send(ws, "error", { message: "Not connected to agent" });
     return;
   }
@@ -350,10 +376,12 @@ async function handleListSessions(
       cursor: params.cursor,
     });
 
-    logSession.info({ count: result.sessions.length, hasMore: !!result.nextCursor }, "listed");
+    const MAX_SESSIONS = 20;
+    const sessions = result.sessions.slice(0, MAX_SESSIONS);
+    logSession.info({ total: result.sessions.length, returned: sessions.length, hasMore: !!result.nextCursor }, "listed");
 
     send(ws, "session_list", {
-      sessions: result.sessions.map((s: acp.SessionInfo) => ({
+      sessions: sessions.map((s: acp.SessionInfo) => ({
         _meta: s._meta,
         cwd: s.cwd,
         sessionId: s.sessionId,
@@ -375,6 +403,7 @@ async function handleLoadSession(
 ): Promise<void> {
   const state = clients.get(ws);
   if (!state?.connection) {
+    logAgent.warn({ hasState: !!state, hasProcess: !!state?.process, processKilled: state?.process?.killed, exitCode: state?.process?.exitCode }, "handleLoadSession: not connected to agent");
     send(ws, "error", { message: "Not connected to agent" });
     return;
   }
@@ -414,6 +443,7 @@ async function handleResumeSession(
 ): Promise<void> {
   const state = clients.get(ws);
   if (!state?.connection) {
+    logAgent.warn({ hasState: !!state, hasProcess: !!state?.process, processKilled: state?.process?.killed, exitCode: state?.process?.exitCode }, "handleResumeSession: not connected to agent");
     send(ws, "error", { message: "Not connected to agent" });
     return;
   }
@@ -577,6 +607,7 @@ export async function startServer(config: ServerConfig): Promise<void> {
       rcsUrl,
       apiToken: rcsToken || "",
       agentName: command,
+      maxSessions: 1,
     });
 
     const relayWs = createRelayWs();
@@ -769,10 +800,16 @@ export async function startServer(config: ServerConfig): Promise<void> {
   // Heartbeat: periodically ping all connected clients
   setInterval(() => {
     for (const [ws, state] of clients) {
+      // Skip virtual relay connections (no raw socket, always alive)
+      if (!ws.raw && state.isAlive) continue;
+      if (!ws.raw) {
+        // Connection already closed, clean up
+        clients.delete(ws);
+        continue;
+      }
       if (!state.isAlive) {
         logWs.info("heartbeat timeout, terminating");
-        const rawWs = ws.raw as RawWebSocket;
-        rawWs.terminate();
+        (ws.raw as RawWebSocket).terminate();
         continue;
       }
       state.isAlive = false;
