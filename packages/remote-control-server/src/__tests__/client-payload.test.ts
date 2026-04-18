@@ -5,8 +5,6 @@ import type { SessionEvent } from "../transport/event-bus";
 function makeEvent(overrides: Partial<SessionEvent> & Pick<SessionEvent, "type" | "sessionId">): SessionEvent {
   return {
     id: "evt-1",
-    sessionId: overrides.sessionId,
-    type: overrides.type,
     payload: null,
     direction: "inbound",
     seqNum: 1,
