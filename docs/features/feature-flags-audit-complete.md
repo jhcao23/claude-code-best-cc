@@ -34,7 +34,7 @@ Claude Code 使用三层门控系统:
 |------|------|----------|
 | COMPLETE | 22 | BRIDGE_MODE, COORDINATOR_MODE, CONTEXT_COLLAPSE, VOICE_MODE, TEAMMEM, COMMIT_ATTRIBUTION, ULTRAPLAN, BASH_CLASSIFIER, TRANSCRIPT_CLASSIFIER, EXTRACT_MEMORIES, CACHED_MICROCOMPACT, TOKEN_BUDGET, AGENT_TRIGGERS, REACTIVE_COMPACT, KAIROS_BRIEF, CCR_REMOTE_SETUP, SHOT_STATS, BG_SESSIONS, PROACTIVE, CHICAGO_MCP, VERIFICATION_AGENT, PROMPT_CACHE_BREAK_DETECTION |
 | PARTIAL | 19 | KAIROS, BUDDY, MONITOR_TOOL, HISTORY_SNIP, WORKFLOW_SCRIPTS, UDS_INBOX, KAIROS_CHANNELS, FORK_SUBAGENT, EXPERIMENTAL_SKILL_SEARCH, WEB_BROWSER_TOOL, MCP_SKILLS, REVIEW_ARTIFACT, KAIROS_GITHUB_WEBHOOKS, CONNECTOR_TEXT, TEMPLATES, LODESTONE, HISTORY_PICKER, MESSAGE_ACTIONS, TERMINAL_PANEL |
-| STUB | 51 | TORCH, KAIROS_DREAM, KAIROS_PUSH_NOTIFICATION, DAEMON, DIRECT_CONNECT, SSH_REMOTE, STREAMLINED_OUTPUT, ANTI_DISTILLATION_CC, NATIVE_CLIENT_ATTESTATION, ABLATION_BASELINE, AGENT_MEMORY_SNAPSHOT, AGENT_TRIGGERS_REMOTE, ALLOW_TEST_VERSIONS, AUTO_THEME, AWAY_SUMMARY, BREAK_CACHE_COMMAND, BUILDING_CLAUDE_APPS, BUILTIN_EXPLORE_PLAN_AGENTS, BYOC_ENVIRONMENT_RUNNER, CCR_AUTO_CONNECT, CCR_MIRROR, COMPACTION_REMINDERS, COWORKER_TYPE_TELEMETRY, DOWNLOAD_USER_SETTINGS, DUMP_SYSTEM_PROMPT, ENHANCED_TELEMETRY_BETA, FILE_PERSISTENCE, HARD_FAIL, HOOK_PROMPTS, IS_LIBC_GLIBC, IS_LIBC_MUSL, MCP_RICH_OUTPUT, MEMORY_SHAPE_TELEMETRY, NATIVE_CLIPBOARD_IMAGE, NEW_INIT, OVERFLOW_TEST_TOOL, PERFETTO_TRACING, POWERSHELL_AUTO_MODE, QUICK_SEARCH, RUN_SKILL_GENERATOR, SELF_HOSTED_RUNNER, SKILL_IMPROVEMENT, SLOW_OPERATION_LOGGING, TREE_SITTER_BASH, TREE_SITTER_BASH_SHADOW, ULTRATHINK, UNATTENDED_RETRY, UPLOAD_USER_SETTINGS, SKIP_DETECTION_WHEN_AUTOUPDATES_DISABLED |
+| STUB | 38 | TORCH, KAIROS_DREAM, KAIROS_PUSH_NOTIFICATION, DIRECT_CONNECT, SSH_REMOTE, STREAMLINED_OUTPUT, ANTI_DISTILLATION_CC, NATIVE_CLIENT_ATTESTATION, ABLATION_BASELINE, AGENT_MEMORY_SNAPSHOT, ALLOW_TEST_VERSIONS, AUTO_THEME, BREAK_CACHE_COMMAND, BUILDING_CLAUDE_APPS, BYOC_ENVIRONMENT_RUNNER, CCR_AUTO_CONNECT, CCR_MIRROR, COMPACTION_REMINDERS, COWORKER_TYPE_TELEMETRY, DOWNLOAD_USER_SETTINGS, DUMP_SYSTEM_PROMPT, ENHANCED_TELEMETRY_BETA, FILE_PERSISTENCE, HARD_FAIL, HOOK_PROMPTS, IS_LIBC_GLIBC, IS_LIBC_MUSL, MCP_RICH_OUTPUT, MEMORY_SHAPE_TELEMETRY, NATIVE_CLIPBOARD_IMAGE, NEW_INIT, OVERFLOW_TEST_TOOL, PERFETTO_TRACING, POWERSHELL_AUTO_MODE, QUICK_SEARCH, RUN_SKILL_GENERATOR, SELF_HOSTED_RUNNER, SKILL_IMPROVEMENT, SLOW_OPERATION_LOGGING, TREE_SITTER_BASH, TREE_SITTER_BASH_SHADOW, UNATTENDED_RETRY, UPLOAD_USER_SETTINGS, SKIP_DETECTION_WHEN_AUTOUPDATES_DISABLED |
 
 ---
 
@@ -51,14 +51,31 @@ Claude Code 使用三层门控系统:
 | SHOT_STATS | **ON** | **ON** | compile-only, 已验证 | 纯本地统计 |
 | PROMPT_CACHE_BREAK_DETECTION | **ON** | **ON** | compile-only, 已验证 | 内部诊断 |
 | TOKEN_BUDGET | **ON** | **ON** | compile-only, 已验证 | 支持 `+500k` 语法 |
-| AGENT_TRIGGERS | **ON** | **ON** | compile+GB gate, 已验证 | 本轮新增，定时任务系统 |
-| EXTRACT_MEMORIES | **ON** | **ON** | compile+GB gate, 已验证 | 本轮新增，自动记忆提取 |
-| VERIFICATION_AGENT | **ON** | **ON** | compile+GB gate, 已验证 | 本轮新增，对抗性验证代理 |
-| KAIROS_BRIEF | **ON** | **ON** | compile+GB gate, 已验证 | 本轮新增，Brief 精简模式 |
-| AWAY_SUMMARY | **ON** | **ON** | compile+GB gate, 已验证 | 本轮新增，离开摘要 |
+| AGENT_TRIGGERS | **ON** | **ON** | compile+GB gate, 已验证 | 本地定时任务系统 |
+| ULTRATHINK | **ON** | **ON** | compile-only | 扩展思考模式 |
+| BUILTIN_EXPLORE_PLAN_AGENTS | **ON** | **ON** | compile-only | 内置 Explore/Plan agent |
+| LODESTONE | **ON** | **ON** | compile-only | 深度链接 URL 协议 |
+| EXTRACT_MEMORIES | **ON** | **ON** | compile+GB gate, 已验证 | 自动记忆提取 |
+| VERIFICATION_AGENT | **ON** | **ON** | compile+GB gate, 已验证 | 对抗性验证代理 |
+| KAIROS_BRIEF | **ON** | **ON** | compile+GB gate, 已验证 | Brief 精简模式 |
+| AWAY_SUMMARY | **ON** | **ON** | compile+GB gate, 已验证 | 离开摘要 |
+| ULTRAPLAN | **ON** | **ON** | compile+remote | 高级规划，需 CCR 基础设施 |
+| DAEMON | **ON** | **ON** | compile-only | 后台守护进程 |
+| ACP | **ON** | **ON** | compile-only | ACP 协议支持 |
+| WORKFLOW_SCRIPTS | **ON** | **ON** | compile-only | 工作流脚本 |
+| HISTORY_SNIP | **ON** | **ON** | compile-only | 历史管理 |
+| CONTEXT_COLLAPSE | **ON** | **ON** | compile-only | 上下文折叠（核心 stub） |
+| MONITOR_TOOL | **ON** | **ON** | compile-only | 后台监控 |
+| FORK_SUBAGENT | **ON** | **ON** | compile-only | 子 Agent |
+| KAIROS | **ON** | **ON** | compile-only | Kairos 调度 |
+| COORDINATOR_MODE | **ON** | **ON** | compile-only | 多 Worker 协调 |
 | BUDDY | off | **ON** | compile+GrowthBook | 仅 dev 模式 |
 | TRANSCRIPT_CLASSIFIER | off | **ON** | compile+GrowthBook | 仅 dev 模式 |
 | BRIDGE_MODE | off | **ON** | compile+remote | 仅 dev 模式，需 claude.ai 订阅 |
+| UDS_INBOX | off | **ON** | compile-only | 仅 dev 模式 |
+| LAN_PIPES | off | **ON** | compile-only | 仅 dev 模式 |
+| BG_SESSIONS | off | **ON** | compile+GB gate | 仅 dev 模式 |
+| TEMPLATES | off | **ON** | compile-only | 仅 dev 模式 |
 
 ---
 
@@ -124,8 +141,8 @@ Claude Code 使用三层门控系统:
 8. src/hooks/useReplBridge.tsx — REPL 桥接 Hook
 9. src/main.tsx — 主入口中的桥接模式启动
 10. src/screens/REPL.tsx — REPL 屏幕中的桥接集成
-11. src/tools/BriefTool/attachments.ts — Brief 工具附件处理
-12. src/tools/BriefTool/upload.ts — Brief 工具上传
+11. packages/builtin-tools/src/tools/BriefTool/attachments.ts — Brief 工具附件处理
+12. packages/builtin-tools/src/tools/BriefTool/upload.ts — Brief 工具上传
 13. src/tools/ConfigTool/supportedSettings.ts — 配置工具中的桥接设置
 
 **启用所需操作**: 仅需将编译标志 `BRIDGE_MODE` 设为 `true`。所有代码完整，命令入口 `src/commands/bridge/index.ts`（604 行）和 `src/commands/bridge/bridge.tsx`（46,907 行）均存在。
@@ -597,7 +614,7 @@ src/utils/swarm/ 目录（22 个文件）:
 
 | 文件路径 | 行数 | 功能说明 |
 |----------|------|----------|
-| src/tools/BriefTool/BriefTool.ts | 204 行 | Brief 工具核心 |
+| packages/builtin-tools/src/tools/BriefTool/BriefTool.ts | 204 行 | Brief 工具核心 |
 | src/commands/brief.ts | 130 行 | Brief 命令实现 |
 
 **引用该标志的文件（20 个）**:
@@ -615,7 +632,7 @@ src/utils/swarm/ 目录（22 个文件）:
 12. src/hooks/useGlobalKeybindings.tsx — 全局键绑定
 13. src/keybindings/defaultBindings.ts — 默认键绑定
 14. src/main.tsx — 主入口
-15. src/tools/BriefTool/BriefTool.ts — Brief 工具
+15. packages/builtin-tools/src/tools/BriefTool/BriefTool.ts — Brief 工具
 16. src/tools/ToolSearchTool/prompt.ts — 工具搜索提示
 17. src/utils/attachments.ts — 附件
 18. src/utils/conversationRecovery.ts — 对话恢复
@@ -858,7 +875,7 @@ src/utils/swarm/ 目录（22 个文件）:
 41. src/tools/AgentTool/AgentTool.tsx
 42. src/tools/AskUserQuestionTool/AskUserQuestionTool.tsx
 43. src/tools/BashTool/BashTool.tsx
-44. src/tools/BriefTool/BriefTool.ts
+44. packages/builtin-tools/src/tools/BriefTool/BriefTool.ts
 45. src/tools/ConfigTool/supportedSettings.ts
 46. src/tools/EnterPlanModeTool/EnterPlanModeTool.ts
 47. src/tools/ExitPlanModeTool/ExitPlanModeV2Tool.ts
