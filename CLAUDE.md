@@ -162,7 +162,7 @@ bun run docs:dev
 | `packages/langfuse-dashboard/` | Langfuse 可观测性面板（非 workspace 包） |
 | `packages/mcp-client/` | MCP 客户端库 |
 | `packages/mcp-server/` | MCP 服务端库（非 workspace 包） |
-| `packages/remote-control-server/` | 自托管 Remote Control Server（Docker 部署，含 Web UI） |
+| `packages/remote-control-server/` | 自托管 Remote Control Server（Docker 部署，含 Web UI）— Web UI 已重构为 React + Vite + Radix UI，支持 ACP agent 接入 |
 | `packages/swarm/` | Swarm 解耦模块（非 workspace 包） |
 | `packages/shell/` | Shell 抽象（非 workspace 包） |
 | `packages/audio-capture-napi/` | 原生音频捕获（已恢复） |
@@ -174,15 +174,16 @@ bun run docs:dev
 ### Bridge / Remote Control
 
 - **`src/bridge/`** (~38 files) — Remote Control / Bridge 模式。feature-gated by `BRIDGE_MODE`。包含 bridge API、会话管理、JWT 认证、消息传输、权限回调等。Entry: `bridgeMain.ts`。
-- **`packages/remote-control-server/`** — 自托管 RCS，支持 Docker 部署，含 Web UI 控制面板（React + Vite）。通过 `bun run rcs` 启动。
+- **`packages/remote-control-server/`** — 自托管 RCS，支持 Docker 部署，含 Web UI 控制面板（React 19 + Vite + Radix UI）。支持 ACP agent 通过 acp-link 接入（ACP WebSocket handler、relay handler、SSE event stream）。通过 `bun run rcs` 启动。
 - CLI 快速路径: `claude remote-control` / `claude rc` / `claude bridge`。
 - 详见 `docs/features/remote-control-self-hosting.md`。
 
 ### ACP Protocol (Agent Client Protocol)
 
 - **`src/services/acp/`** — ACP agent 实现，包含 `agent.ts`（AcpAgent 类）、`bridge.ts`（Claude Code ↔ ACP 桥接）、`permissions.ts`（权限处理）、`entry.ts`（入口）。
-- **`packages/acp-link/`** — ACP 代理服务器，将 WebSocket 客户端桥接到 ACP agent。提供 `acp-link` CLI 命令，支持自定义端口/HTTPS/认证/会话管理。
-- ACP Plan 可视化已支持 `session/update plan` 类型的消息展示。
+- **`packages/acp-link/`** — ACP 代理服务器，将 WebSocket 客户端桥接到 ACP agent。提供 `acp-link` CLI 命令，支持自定义端口/HTTPS/认证/会话管理、RCS 集成（REST 注册 + WS identify 两步流程）、权限模式透传（fallback: 客户端传值 > config > `ACP_PERMISSION_MODE` 环境变量）。
+- ACP 权限管道改进：`createAcpCanUseTool` 统一权限流水线，`applySessionMode` 模式同步，`bypassPermissions` 可用性检测（非 root/sandbox 环境）。
+- ACP Plan 可视化已支持 `session/update plan` 类型的消息展示（PlanView 组件，含进度条/状态图标/优先级标签）。
 
 ### Daemon Mode
 
