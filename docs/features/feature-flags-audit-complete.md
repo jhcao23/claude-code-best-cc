@@ -143,7 +143,7 @@ Claude Code 使用三层门控系统:
 10. src/screens/REPL.tsx — REPL 屏幕中的桥接集成
 11. packages/builtin-tools/src/tools/BriefTool/attachments.ts — Brief 工具附件处理
 12. packages/builtin-tools/src/tools/BriefTool/upload.ts — Brief 工具上传
-13. src/tools/ConfigTool/supportedSettings.ts — 配置工具中的桥接设置
+13. packages/builtin-tools/src/tools/ConfigTool/supportedSettings.ts — 配置工具中的桥接设置
 
 **启用所需操作**: 仅需将编译标志 `BRIDGE_MODE` 设为 `true`。所有代码完整，命令入口 `src/commands/bridge/index.ts`（604 行）和 `src/commands/bridge/bridge.tsx`（46,907 行）均存在。
 
@@ -202,8 +202,8 @@ src/utils/swarm/ 目录（22 个文件）:
 7. src/screens/REPL.tsx — REPL 屏幕中的协调器集成
 8. src/screens/ResumeConversation.tsx — 恢复对话时的协调器处理
 9. src/tools.ts — 工具注册中的协调器工具
-10. src/tools/AgentTool/AgentTool.tsx — Agent 工具中的协调器模式分支
-11. src/tools/AgentTool/builtInAgents.ts — 内置代理定义
+10. packages/builtin-tools/src/tools/AgentTool/AgentTool.tsx — Agent 工具中的协调器模式分支
+11. packages/builtin-tools/src/tools/AgentTool/builtInAgents.ts — 内置代理定义
 12. src/utils/processUserInput/processSlashCommand.tsx — 斜杠命令处理中的协调器
 13. src/utils/sessionRestore.ts — 会话恢复中的协调器状态
 14. src/utils/systemPrompt.ts — 系统提示中的协调器指令
@@ -276,9 +276,9 @@ src/utils/swarm/ 目录（22 个文件）:
 9. src/screens/REPL.tsx — REPL 中的语音模式集成
 10. src/services/voiceStreamSTT.ts — STT 服务
 11. src/state/AppState.tsx — 应用状态中的语音状态
-12. src/tools/ConfigTool/ConfigTool.ts — 配置工具中的语音设置
-13. src/tools/ConfigTool/prompt.ts — 配置工具提示
-14. src/tools/ConfigTool/supportedSettings.ts — 支持的设置项
+12. packages/builtin-tools/src/tools/ConfigTool/ConfigTool.ts — 配置工具中的语音设置
+13. packages/builtin-tools/src/tools/ConfigTool/prompt.ts — 配置工具提示
+14. packages/builtin-tools/src/tools/ConfigTool/supportedSettings.ts — 支持的设置项
 15. src/utils/settings/types.ts — 设置类型定义
 16. src/voice/voiceModeEnabled.ts — 语音模式启用逻辑
 
@@ -448,11 +448,11 @@ src/utils/swarm/ 目录（22 个文件）:
 22. src/screens/REPL.tsx — REPL 屏幕
 23. src/services/api/claude.ts — Claude API 服务
 24. src/services/tools/toolExecution.ts — 工具执行
-25. src/tools/AgentTool/AgentTool.tsx — Agent 工具
-26. src/tools/AgentTool/agentToolUtils.ts — Agent 工具工具函数
-27. src/tools/AgentTool/runAgent.ts — 运行 Agent
+25. packages/builtin-tools/src/tools/AgentTool/AgentTool.tsx — Agent 工具
+26. packages/builtin-tools/src/tools/AgentTool/agentToolUtils.ts — Agent 工具工具函数
+27. packages/builtin-tools/src/tools/AgentTool/runAgent.ts — 运行 Agent
 28. src/tools/BashTool/bashPermissions.ts — Bash 权限
-29. src/tools/ConfigTool/supportedSettings.ts — 支持的设置
+29. packages/builtin-tools/src/tools/ConfigTool/supportedSettings.ts — 支持的设置
 30. src/tools/ExitPlanModeTool/ExitPlanModeV2Tool.ts — 退出计划模式工具
 31. src/tools/NotebookEditTool/NotebookEditTool.ts — Notebook 编辑工具
 32. src/types/permissions.ts — 权限类型
@@ -734,7 +734,7 @@ src/utils/swarm/ 目录（22 个文件）:
 9. src/screens/REPL.tsx — REPL（多处引用，通过 require 加载 proactive 模块）
 10. src/services/compact/prompt.ts — 压缩提示
 11. src/tools.ts — 工具注册
-12. src/tools/AgentTool/AgentTool.tsx — Agent 工具
+12. packages/builtin-tools/src/tools/AgentTool/AgentTool.tsx — Agent 工具
 13. src/utils/sessionStorage.ts — 会话存储
 14. src/utils/settings/types.ts — 设置类型
 15. src/utils/systemPrompt.ts — 系统提示
@@ -787,11 +787,11 @@ src/utils/swarm/ 目录（22 个文件）:
 | 文件路径 | 行数 | 功能说明 |
 |----------|------|----------|
 | src/tools/TaskUpdateTool/TaskUpdateTool.ts | 406 行 | 任务更新工具 |
-| src/tools/AgentTool/builtInAgents.ts | 72 行 | 内置代理定义 |
+| packages/builtin-tools/src/tools/AgentTool/builtInAgents.ts | 72 行 | 内置代理定义 |
 
 **引用该标志的文件（4 个）**:
 1. src/constants/prompts.ts — 提示词
-2. src/tools/AgentTool/builtInAgents.ts — 内置代理
+2. packages/builtin-tools/src/tools/AgentTool/builtInAgents.ts — 内置代理
 3. src/tools/TaskUpdateTool/TaskUpdateTool.ts — 任务更新工具
 4. src/tools/TodoWriteTool/TodoWriteTool.ts — TodoWrite 工具
 
@@ -812,7 +812,7 @@ src/utils/swarm/ 目录（22 个文件）:
 3. src/services/compact/autoCompact.ts — 自动压缩
 4. src/services/compact/compact.ts — 压缩核心
 5. src/services/compact/microCompact.ts — 微压缩
-6. src/tools/AgentTool/runAgent.ts — 运行 Agent
+6. packages/builtin-tools/src/tools/AgentTool/runAgent.ts — 运行 Agent
 
 **启用所需操作**: 仅需将编译标志 `PROMPT_CACHE_BREAK_DETECTION` 设为 `true`。
 
@@ -872,11 +872,11 @@ src/utils/swarm/ 目录（22 个文件）:
 38. src/services/mcp/useManageMCPConnections.ts
 39. src/skills/bundled/index.ts
 40. src/tools.ts
-41. src/tools/AgentTool/AgentTool.tsx
+41. packages/builtin-tools/src/tools/AgentTool/AgentTool.tsx
 42. src/tools/AskUserQuestionTool/AskUserQuestionTool.tsx
 43. src/tools/BashTool/BashTool.tsx
 44. packages/builtin-tools/src/tools/BriefTool/BriefTool.ts
-45. src/tools/ConfigTool/supportedSettings.ts
+45. packages/builtin-tools/src/tools/ConfigTool/supportedSettings.ts
 46. src/tools/EnterPlanModeTool/EnterPlanModeTool.ts
 47. src/tools/ExitPlanModeTool/ExitPlanModeV2Tool.ts
 48. src/tools/PowerShellTool/PowerShellTool.tsx
@@ -957,7 +957,7 @@ src/utils/swarm/ 目录（22 个文件）:
 3. src/tasks.ts — 任务注册
 4. src/tasks/LocalShellTask/LocalShellTask.tsx — Shell 任务
 5. src/tools.ts — 工具注册
-6. src/tools/AgentTool/runAgent.ts — Agent 运行
+6. packages/builtin-tools/src/tools/AgentTool/runAgent.ts — Agent 运行
 7. src/tools/BashTool/BashTool.tsx — Bash 工具
 8. src/tools/BashTool/prompt.ts — Bash 提示
 9. src/tools/PowerShellTool/PowerShellTool.tsx — PowerShell 工具
@@ -1102,13 +1102,13 @@ src/utils/swarm/ 目录（22 个文件）:
 
 | 文件路径 | 行数 | 功能说明 |
 |----------|------|----------|
-| src/tools/AgentTool/forkSubagent.ts | 210 行 | 分叉子代理核心逻辑 |
+| packages/builtin-tools/src/tools/AgentTool/forkSubagent.ts | 210 行 | 分叉子代理核心逻辑 |
 
 **引用该标志的文件（5 个）**:
 1. src/commands.ts — 命令注册
 2. src/commands/branch/index.ts — 分支命令入口
 3. src/components/messages/UserTextMessage.tsx — 用户消息
-4. src/tools/AgentTool/forkSubagent.ts — 分叉逻辑
+4. packages/builtin-tools/src/tools/AgentTool/forkSubagent.ts — 分叉逻辑
 5. src/tools/ToolSearchTool/prompt.ts — 工具搜索提示
 
 **缺失文件**:
@@ -1352,7 +1352,7 @@ src/utils/swarm/ 目录（22 个文件）:
 **引用文件**:
 1. src/components/Settings/Config.tsx — 设置
 2. src/tools.ts — 工具注册
-3. src/tools/ConfigTool/supportedSettings.ts — 支持的设置
+3. packages/builtin-tools/src/tools/ConfigTool/supportedSettings.ts — 支持的设置
 **代码量**: 0 行专属代码，仅在设置中预留了开关位
 
 ---
@@ -1440,7 +1440,7 @@ src/utils/swarm/ 目录（22 个文件）:
 **分类**: STUB
 **引用文件**:
 1. src/main.tsx — 主入口
-2. src/tools/AgentTool/loadAgentsDir.ts — 加载代理目录
+2. packages/builtin-tools/src/tools/AgentTool/loadAgentsDir.ts — 加载代理目录
 **代码量**: 0 行专属代码
 
 ---
@@ -1475,7 +1475,7 @@ src/utils/swarm/ 目录（22 个文件）:
 **引用文件**:
 1. src/components/ThemePicker.tsx — 主题选择器
 2. src/components/design-system/ThemeProvider.tsx — 主题提供者
-3. src/tools/ConfigTool/supportedSettings.ts — 支持的设置
+3. packages/builtin-tools/src/tools/ConfigTool/supportedSettings.ts — 支持的设置
 **代码量**: 0 行专属代码
 
 ---
@@ -1517,7 +1517,7 @@ src/utils/swarm/ 目录（22 个文件）:
 **编译时引用次数**: 1
 **功能描述**: 内置探索和计划代理。
 **分类**: STUB
-**引用文件**: src/tools/AgentTool/builtInAgents.ts — 内置代理定义
+**引用文件**: packages/builtin-tools/src/tools/AgentTool/builtInAgents.ts — 内置代理定义
 **代码量**: 0 行专属代码
 
 ---
