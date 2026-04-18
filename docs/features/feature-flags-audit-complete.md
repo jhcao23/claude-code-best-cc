@@ -402,8 +402,8 @@ src/utils/swarm/ 目录（22 个文件）:
 11. src/hooks/toolPermission/permissionLogging.ts — 权限日志
 12. src/hooks/useCanUseTool.tsx — 工具可用性检查
 13. src/services/api/withRetry.ts — API 重试中的分类器
-14. src/tools/BashTool/bashPermissions.ts — Bash 权限逻辑
-15. src/tools/BashTool/pathValidation.ts — 路径验证
+14. packages/builtin-tools/src/tools/BashTool/bashPermissions.ts — Bash 权限逻辑
+15. packages/builtin-tools/src/tools/BashTool/pathValidation.ts — 路径验证
 16. src/utils/classifierApprovals.ts — 分类器审批记录
 17. src/utils/messages.ts — 消息处理
 18. src/utils/permissions/permissions.ts — 权限核心
@@ -451,7 +451,7 @@ src/utils/swarm/ 目录（22 个文件）:
 25. packages/builtin-tools/src/tools/AgentTool/AgentTool.tsx — Agent 工具
 26. packages/builtin-tools/src/tools/AgentTool/agentToolUtils.ts — Agent 工具工具函数
 27. packages/builtin-tools/src/tools/AgentTool/runAgent.ts — 运行 Agent
-28. src/tools/BashTool/bashPermissions.ts — Bash 权限
+28. packages/builtin-tools/src/tools/BashTool/bashPermissions.ts — Bash 权限
 29. packages/builtin-tools/src/tools/ConfigTool/supportedSettings.ts — 支持的设置
 30. src/tools/ExitPlanModeTool/ExitPlanModeV2Tool.ts — 退出计划模式工具
 31. src/tools/NotebookEditTool/NotebookEditTool.ts — Notebook 编辑工具
@@ -874,7 +874,7 @@ src/utils/swarm/ 目录（22 个文件）:
 40. src/tools.ts
 41. packages/builtin-tools/src/tools/AgentTool/AgentTool.tsx
 42. src/tools/AskUserQuestionTool/AskUserQuestionTool.tsx
-43. src/tools/BashTool/BashTool.tsx
+43. packages/builtin-tools/src/tools/BashTool/BashTool.tsx
 44. packages/builtin-tools/src/tools/BriefTool/BriefTool.ts
 45. packages/builtin-tools/src/tools/ConfigTool/supportedSettings.ts
 46. src/tools/EnterPlanModeTool/EnterPlanModeTool.ts
@@ -946,7 +946,7 @@ src/utils/swarm/ 目录（22 个文件）:
 | 文件路径 | 行数 | 功能说明 |
 |----------|------|----------|
 | src/tasks/LocalShellTask/LocalShellTask.tsx | 522 行 | 本地 Shell 任务完整实现 |
-| src/tools/MonitorTool/MonitorTool.ts | 1 行 | 监控工具（桩） |
+| packages/builtin-tools/src/tools/MonitorTool/MonitorTool.ts | 1 行 | 监控工具（桩） |
 | src/tasks/MonitorMcpTask/MonitorMcpTask.ts | 5 行 | MCP 监控任务（桩） |
 | src/components/tasks/MonitorMcpDetailDialog.tsx | 3 行 | MCP 详情对话框（桩） |
 | src/components/permissions/MonitorPermissionRequest/MonitorPermissionRequest.tsx | 3 行 | 监控权限请求（桩） |
@@ -958,11 +958,11 @@ src/utils/swarm/ 目录（22 个文件）:
 4. src/tasks/LocalShellTask/LocalShellTask.tsx — Shell 任务
 5. src/tools.ts — 工具注册
 6. packages/builtin-tools/src/tools/AgentTool/runAgent.ts — Agent 运行
-7. src/tools/BashTool/BashTool.tsx — Bash 工具
-8. src/tools/BashTool/prompt.ts — Bash 提示
+7. packages/builtin-tools/src/tools/BashTool/BashTool.tsx — Bash 工具
+8. packages/builtin-tools/src/tools/BashTool/prompt.ts — Bash 提示
 9. src/tools/PowerShellTool/PowerShellTool.tsx — PowerShell 工具
 
-**启用所需修复**: 需要实现 `src/tools/MonitorTool/MonitorTool.ts`、`src/tasks/MonitorMcpTask/MonitorMcpTask.ts`、`src/components/tasks/MonitorMcpDetailDialog.tsx` 和 `src/components/permissions/MonitorPermissionRequest/MonitorPermissionRequest.tsx`。
+**启用所需修复**: 需要实现 `packages/builtin-tools/src/tools/MonitorTool/MonitorTool.ts`、`src/tasks/MonitorMcpTask/MonitorMcpTask.ts`、`src/components/tasks/MonitorMcpDetailDialog.tsx` 和 `src/components/permissions/MonitorPermissionRequest/MonitorPermissionRequest.tsx`。
 
 ---
 
@@ -1004,10 +1004,10 @@ src/utils/swarm/ 目录（22 个文件）:
 | src/components/WorkflowMultiselectDialog.tsx | 127 行 | 工作流多选对话框（有内容） |
 | src/tasks/LocalWorkflowTask/LocalWorkflowTask.ts | 5 行 | 本地工作流任务（桩） |
 | src/components/tasks/WorkflowDetailDialog.tsx | 3 行 | 工作流详情对话框（桩） |
-| src/tools/WorkflowTool/WorkflowPermissionRequest.tsx | 3 行 | 工作流权限请求（桩） |
-| src/tools/WorkflowTool/createWorkflowCommand.ts | 3 行 | 创建工作流命令（桩） |
-| src/tools/WorkflowTool/WorkflowTool.ts | 1 行 | 工作流工具（桩） |
-| src/tools/WorkflowTool/constants.ts | 1 行 | 常量（桩） |
+| packages/builtin-tools/src/tools/WorkflowTool/WorkflowPermissionRequest.tsx | 3 行 | 工作流权限请求（桩） |
+| packages/builtin-tools/src/tools/WorkflowTool/createWorkflowCommand.ts | 3 行 | 创建工作流命令（桩） |
+| packages/builtin-tools/src/tools/WorkflowTool/WorkflowTool.ts | 1 行 | 工作流工具（桩） |
+| packages/builtin-tools/src/tools/WorkflowTool/constants.ts | 1 行 | 常量（桩） |
 
 **引用该标志的文件（7 个）**:
 1. src/commands.ts — 命令注册（引用 `commands/workflows/index.js`）
@@ -1808,7 +1808,7 @@ src/utils/swarm/ 目录（22 个文件）:
 **功能描述**: Tree-sitter Bash 影子模式（并行运行 tree-sitter 和传统解析器进行对比）。
 **分类**: STUB
 **引用文件**:
-1. src/tools/BashTool/bashPermissions.ts — Bash 权限
+1. packages/builtin-tools/src/tools/BashTool/bashPermissions.ts — Bash 权限
 2. src/utils/bash/parser.ts — Bash 解析器
 **代码量**: 0 行专属代码
 
@@ -1882,16 +1882,16 @@ src/utils/swarm/ 目录（22 个文件）:
 
 | 文件路径 | 行数 | 所属标志 |
 |----------|------|----------|
-| src/tools/MonitorTool/MonitorTool.ts | 1 行 | MONITOR_TOOL |
-| src/tools/WorkflowTool/WorkflowTool.ts | 1 行 | WORKFLOW_SCRIPTS |
-| src/tools/WorkflowTool/constants.ts | 1 行 | WORKFLOW_SCRIPTS |
+| packages/builtin-tools/src/tools/MonitorTool/MonitorTool.ts | 1 行 | MONITOR_TOOL |
+| packages/builtin-tools/src/tools/WorkflowTool/WorkflowTool.ts | 1 行 | WORKFLOW_SCRIPTS |
+| packages/builtin-tools/src/tools/WorkflowTool/constants.ts | 1 行 | WORKFLOW_SCRIPTS |
 | src/tools/ReviewArtifactTool/ReviewArtifactTool.ts | 1 行 | REVIEW_ARTIFACT |
 | src/utils/udsMessaging.ts | 已实现 | UDS_INBOX |
 | src/utils/udsClient.ts | 已实现 | UDS_INBOX |
 | src/skills/mcpSkills.ts | 3 行 | MCP_SKILLS |
 | src/tools/WebBrowserTool/WebBrowserPanel.tsx | 3 行 | WEB_BROWSER_TOOL |
-| src/tools/WorkflowTool/createWorkflowCommand.ts | 3 行 | WORKFLOW_SCRIPTS |
-| src/tools/WorkflowTool/WorkflowPermissionRequest.tsx | 3 行 | WORKFLOW_SCRIPTS |
+| packages/builtin-tools/src/tools/WorkflowTool/createWorkflowCommand.ts | 3 行 | WORKFLOW_SCRIPTS |
+| packages/builtin-tools/src/tools/WorkflowTool/WorkflowPermissionRequest.tsx | 3 行 | WORKFLOW_SCRIPTS |
 | src/components/tasks/WorkflowDetailDialog.tsx | 3 行 | WORKFLOW_SCRIPTS |
 | src/components/permissions/MonitorPermissionRequest/MonitorPermissionRequest.tsx | 3 行 | MONITOR_TOOL |
 | src/components/tasks/MonitorMcpDetailDialog.tsx | 3 行 | MONITOR_TOOL |
