@@ -1,7 +1,8 @@
-import type { ThreadEntry, ToolCallEntry } from "../../src/lib/types";
+import type { ThreadEntry, ToolCallEntry, PlanDisplayEntry } from "../../src/lib/types";
 import { cn } from "../../src/lib/utils";
 import { UserBubble, AssistantBubble } from "./MessageBubble";
 import { ToolCallGroup } from "./ToolCallGroup";
+import { PlanDisplay } from "./PlanView";
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButtons } from "../ai-elements/conversation";
 
 // =============================================================================
@@ -98,6 +99,10 @@ function entrySpacing(entries: ThreadEntry[], index: number): string {
     }
     return "pt-2 pb-4";
   }
+  // Plan 条目适当间距
+  if (entry?.type === "plan") {
+    return "pt-2 pb-2";
+  }
   return "py-1";
 }
 
@@ -126,6 +131,8 @@ function EntryRenderer({
           onPermissionRespond={onPermissionRespond}
         />
       );
+    case "plan":
+      return <PlanDisplay entry={entry as PlanDisplayEntry} />;
     default:
       return null;
   }

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import imageCompression from "browser-image-compression";
 import type { ACPClient } from "../src/acp/client";
 import type { SessionUpdate, PermissionRequestPayload, PermissionOption, ContentBlock, ImageContent } from "../src/acp/types";
-import type { ThreadEntry, ToolCallStatus, ToolCallData, UserMessageImage, UserMessageEntry, AssistantMessageEntry, ToolCallEntry, ChatInputMessage, PendingPermission } from "../src/lib/types";
+import type { ThreadEntry, ToolCallStatus, ToolCallData, UserMessageImage, UserMessageEntry, AssistantMessageEntry, ToolCallEntry, ChatInputMessage, PendingPermission, PlanDisplayEntry } from "../src/lib/types";
 import { ChatView } from "./chat/ChatView";
 import { ChatInput } from "./chat/ChatInput";
 import { PermissionPanel } from "./chat/PermissionPanel";
@@ -382,6 +382,38 @@ export function ChatInterface({ client }: ChatInterfaceProps) {
             },
           };
         });
+      });
+    }
+    // Handle plan update (replace entire plan)
+    else if (update.sessionUpdate === "plan") {
+      setEntries((prev) => {
+        // Empty entries → remove existing plan
+        if (update.entries.length === 0) {
+          return prev.filter((e) => e.type !== "plan");
+        }
+
+        // Find last plan entry
+        const lastPlanIndex = prev.reduce(
+          (acc, entry, i) => (entry.type === "plan" ? i : acc),
+          -1,
+        );
+
+        if (lastPlanIndex >= 0) {
+          // Update existing plan in place
+          return prev.map((entry, index) =>
+            index === lastPlanIndex
+              ? { ...entry, entries: update.entries }
+              : entry,
+          );
+        }
+
+        // Create new plan entry
+        const newPlanEntry: PlanDisplayEntry = {
+          type: "plan",
+          id: `plan-${Date.now()}`,
+          entries: update.entries,
+        };
+        return [...prev, newPlanEntry];
       });
     }
   }, []);
