@@ -474,10 +474,16 @@ export class AcpAgent implements Agent {
       () => this.sessions.get(sessionId)?.modes.currentModeId ?? 'default',
       this.clientCapabilities,
       cwd,
+      (modeId: string) => { this.applySessionMode(sessionId, modeId) },
     )
 
     // Parse MCP servers from ACP params
     // MCP server config is handled separately in the tools system
+
+    // Check if bypass permissions is available (not running as root unless in sandbox)
+    const isBypassAvailable =
+      (typeof process.geteuid === 'function' ? process.geteuid() !== 0 : true) ||
+      !!process.env.IS_SANDBOX
 
     // Create a mutable AppState for the session
     const appState: AppState = {
@@ -485,6 +491,7 @@ export class AcpAgent implements Agent {
       toolPermissionContext: {
         ...permissionContext,
         mode: permissionMode as PermissionMode,
+        isBypassPermissionsModeAvailable: isBypassAvailable,
       },
     }
 
@@ -669,6 +676,11 @@ export class AcpAgent implements Agent {
     const session = this.sessions.get(sessionId)
     if (session) {
       session.modes = { ...session.modes, currentModeId: modeId }
+      // Sync mode to appState so the permission pipeline sees the correct mode
+      session.appState.toolPermissionContext = {
+        ...session.appState.toolPermissionContext,
+        mode: modeId as PermissionMode,
+      }
     }
   }
 
