@@ -92,7 +92,7 @@ ripgrep 执行有专门的错误恢复链（`src/utils/ripgrep.ts`）：
 
 ## ToolSearch：在 50+ 工具中发现目标
 
-当可用工具超过 50 个时（含 MCP 提供的外部工具），AI 可能不知道该用哪个。**ToolSearch**（`src/tools/ToolSearchTool/`）提供了工具发现机制。
+当可用工具超过 50 个时（含 MCP 提供的外部工具），AI 可能不知道该用哪个。**ToolSearch**（`packages/builtin-tools/src/tools/ToolSearchTool/`）提供了工具发现机制。
 
 ### 搜索算法
 
@@ -139,14 +139,14 @@ function getDeferredToolsCacheKey(deferredTools: Tools): string {
 
 AI 的信息获取不局限于本地代码：
 
-- **WebSearch**（`src/tools/WebSearchTool/`）：调用 Anthropic API 的 `web_search_20250305` server tool 搜索互联网
-- **WebFetch**（`src/tools/WebFetchTool/`）：抓取特定 URL 内容，转换为 Markdown 供 AI 阅读
+- **WebSearch**（`packages/builtin-tools/src/tools/WebSearchTool/`）：调用 Anthropic API 的 `web_search_20250305` server tool 搜索互联网
+- **WebFetch**（`packages/builtin-tools/src/tools/WebFetchTool/`）：抓取特定 URL 内容，转换为 Markdown 供 AI 阅读
 
 这让 AI 可以查阅文档、搜索 Stack Overflow、阅读 GitHub issue——和人类开发者的工作方式一致。
 
 ### WebSearch 实现机制
 
-WebSearch 通过适配器模式支持三种搜索后端，由 `src/tools/WebSearchTool/adapters/` 中的工厂函数 `createAdapter()` 选择：
+WebSearch 通过适配器模式支持三种搜索后端，由 `packages/builtin-tools/src/tools/WebSearchTool/adapters/` 中的工厂函数 `createAdapter()` 选择：
 
 ```
 适配器架构:
@@ -229,7 +229,7 @@ WebSearch 通过适配器模式支持三种搜索后端，由 `src/tools/WebSear
 
 ### WebSearchTool 统一接口
 
-`WebSearchTool`（`src/tools/WebSearchTool/WebSearchTool.ts`）是面向主循环的工具定义，所有 provider 均可使用（`isEnabled()` 始终返回 true）。它将适配器返回的 `SearchResult[]` 转换为内部 `Output` 格式，`mapToolResultToToolResultBlockParam` 将搜索结果格式化为带 markdown 超链接的文本，并附加 "REMINDER" 要求主模型在回复中包含 Sources。
+`WebSearchTool`（`packages/builtin-tools/src/tools/WebSearchTool/WebSearchTool.ts`）是面向主循环的工具定义，所有 provider 均可使用（`isEnabled()` 始终返回 true）。它将适配器返回的 `SearchResult[]` 转换为内部 `Output` 格式，`mapToolResultToToolResultBlockParam` 将搜索结果格式化为带 markdown 超链接的文本，并附加 "REMINDER" 要求主模型在回复中包含 Sources。
 
 ### WebFetch 实现机制
 
@@ -264,7 +264,7 @@ WebFetch 是一个完整的 HTTP 客户端 + 内容处理管线：
 | **URL 验证** | `validateURL()` | 长度、协议、用户名密码、公网域名检查 |
 | **egress 检测** | `X-Proxy-Error: blocked-by-allowlist` | 检测企业代理拦截 |
 
-预批准域名（`src/tools/WebFetchTool/preapproved.ts`）：
+预批准域名（`packages/builtin-tools/src/tools/WebFetchTool/preapproved.ts`）：
 
 用户无需手动授权即可抓取的域名列表，包含 ~90 个主流技术文档站点（MDN、Python docs、React docs、AWS docs 等）。列表分为 hostname-only 和 path-prefix 两类，查找复杂度 O(1)。
 
