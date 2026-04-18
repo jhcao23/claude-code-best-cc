@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import imageCompression from "browser-image-compression";
 import type { ACPClient } from "../src/acp/client";
-import type { SessionUpdate, ToolCallContent, PermissionRequestPayload, PermissionOption, ContentBlock, ImageContent } from "../src/acp/types";
+import type { SessionUpdate, PermissionRequestPayload, PermissionOption, ContentBlock, ImageContent } from "../src/acp/types";
+import type { ThreadEntry, ToolCallStatus, ToolCallData, UserMessageImage, UserMessageEntry, AssistantMessageEntry, ToolCallEntry, ChatInputMessage, PendingPermission } from "../src/lib/types";
+import { ChatView } from "./chat/ChatView";
+import { ChatInput } from "./chat/ChatInput";
+import { PermissionPanel } from "./chat/PermissionPanel";
+import { ModelSelectorPopover } from "./model-selector";
+import { useCommands } from "../src/hooks/useCommands";
 
 // Image compression options
 // Claude API has a 5MB limit, so we target 2MB to be safe
@@ -38,35 +44,7 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([bytes], { type: mimeType });
 }
 
-// AI Elements components
-import {
-  Conversation,
-  ConversationContent,
-  ConversationEmptyState,
-  ConversationScrollButtons,
-  LAST_USER_MESSAGE_ATTR,
-} from "./ai-elements/conversation";
-import {
-  Message,
-  MessageContent,
-  MessageResponse,
-  MessageAttachment,
-  MessageAttachments,
-} from "./ai-elements/message";
-import {
-  PromptInput,
-  PromptInputTextarea,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputHeader,
-  PromptInputAttachments,
-  PromptInputAttachment,
-  PromptInputButton,
-  usePromptInputAttachments,
-  type PromptInputMessage,
-} from "./ai-elements/prompt-input";
-import { ImageIcon, Plus } from "lucide-react";
-import { ModelSelectorPopover } from "./model-selector";
+import { Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   Tooltip,
@@ -74,134 +52,12 @@ import {
   TooltipTrigger,
 } from "./ui/tooltip";
 
-// Reference: Zed's add_images_from_picker() - Button to open file dialog for images
-// Must be inside PromptInput to access attachments context
-function AddImageButton() {
-  const attachments = usePromptInputAttachments();
-  return (
-    <PromptInputButton
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={() => attachments.openFileDialog()}
-    >
-      <ImageIcon className="size-4" />
-      <span className="sr-only">Attach image</span>
-    </PromptInputButton>
-  );
-}
-import {
-  Tool,
-  ToolHeader,
-  ToolContent,
-  ToolInput,
-  ToolOutput,
-} from "./ai-elements/tool";
-import { Shimmer } from "./ai-elements/shimmer";
-import {
-  Reasoning,
-  ReasoningTrigger,
-  ReasoningContent,
-} from "./ai-elements/reasoning";
-import { ToolPermissionButtons } from "./ai-elements/permission-request";
-
 // =============================================================================
-// Type Definitions - Flat Entry Structure (matching Zed's architecture)
+// Type Definitions - imported from shared types module
 // =============================================================================
-
-// Tool call status (matches Zed's ToolCallStatus enum)
-type ToolCallStatus = "running" | "complete" | "error" | "waiting_for_confirmation" | "rejected" | "canceled";
-
-// Tool call data
-interface ToolCallData {
-  id: string;
-  title: string;
-  status: ToolCallStatus;
-  content?: ToolCallContent[];
-  rawInput?: Record<string, unknown>;
-  rawOutput?: Record<string, unknown>;
-  // Permission request data (only when status is "waiting_for_confirmation")
-  permissionRequest?: {
-    requestId: string;
-    options: PermissionOption[];
-  };
-  // True if this is a standalone permission request (not attached to a real tool call)
-  isStandalonePermission?: boolean;
-}
-
-// Assistant message chunk - can be regular message or thought
-type AssistantChunk =
-  | { type: "message"; text: string }
-  | { type: "thought"; text: string };
-
-// Image data for display in user messages
-// Reference: Zed's ContentBlock::Image stores decoded image for rendering
-interface UserMessageImage {
-  mimeType: string;
-  data: string;  // base64 encoded
-}
-
-// User message entry
-// Reference: Zed's UserMessage { content: ContentBlock, chunks: Vec<acp::ContentBlock> }
-interface UserMessageEntry {
-  type: "user_message";
-  id: string;
-  content: string;
-  images?: UserMessageImage[];  // Images attached to this message
-}
-
-// Assistant message entry - contains chunks (text + thoughts)
-interface AssistantMessageEntry {
-  type: "assistant_message";
-  id: string;
-  chunks: AssistantChunk[];
-}
-
-// Tool call entry - standalone, not nested in messages
-interface ToolCallEntry {
-  type: "tool_call";
-  toolCall: ToolCallData;
-}
-
-// Thread entry - flat list of all entries
-type ThreadEntry = UserMessageEntry | AssistantMessageEntry | ToolCallEntry;
 
 interface ChatInterfaceProps {
   client: ACPClient;
-}
-
-// Helper to format tool call content for display
-function formatToolOutput(
-  content?: ToolCallContent[],
-  rawOutput?: Record<string, unknown>,
-): unknown {
-  // First try to extract from structured content
-  if (content && content.length > 0) {
-    const results: string[] = [];
-
-    for (const item of content) {
-      if (item.type === "content") {
-        if (item.content.type === "text" && item.content.text) {
-          results.push(item.content.text);
-        }
-      } else if (item.type === "diff") {
-        results.push(`📝 ${item.path}\n--- Old\n+++ New\n${item.newText}`);
-      } else if (item.type === "terminal") {
-        results.push(`🖥️ Terminal: ${item.terminalId}`);
-      }
-    }
-
-    if (results.length > 0) {
-      return results.length === 1 ? results[0] : results.join("\n\n");
-    }
-  }
-
-  // Fall back to rawOutput if content didn't produce results
-  if (rawOutput && Object.keys(rawOutput).length > 0) {
-    return rawOutput;
-  }
-
-  return null;
 }
 
 // =============================================================================
@@ -237,8 +93,11 @@ export function ChatInterface({ client }: ChatInterfaceProps) {
   const [sessionReady, setSessionReady] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Reference: Zed's supports_images() checks prompt_capabilities.image
   const [supportsImages, setSupportsImages] = useState(false);
+  const { commands: availableCommands } = useCommands(client);
 
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
@@ -561,15 +420,26 @@ export function ChatInterface({ client }: ChatInterfaceProps) {
 
     client.setPermissionRequestHandler(handlePermissionRequest);
 
+    client.setErrorMessageHandler((msg) => {
+      console.error("[ChatInterface] Agent error:", msg);
+      setErrorMessage(msg);
+      // Clear any existing timer
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      // Auto-clear after 5 seconds
+      errorTimerRef.current = setTimeout(() => setErrorMessage(null), 5000);
+    });
+
     // Create session
     client.createSession();
     return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
       client.setSessionCreatedHandler(() => {});
       client.setSessionLoadedHandler(() => {});
       client.setSessionSwitchingHandler(null);
       client.setSessionUpdateHandler(() => {});
       client.setPromptCompleteHandler(() => {});
       client.setPermissionRequestHandler(() => {});
+      client.setErrorMessageHandler(() => {});
     };
   }, [activateSession, client, handlePermissionRequest, handleSessionUpdate, resetThreadState]);
 
@@ -597,138 +467,6 @@ export function ChatInterface({ client }: ChatInterfaceProps) {
     // The session_created handler will set sessionReady=true when ready
     client.createSession();
   }, [client, isLoading, resetThreadState]);
-
-  // Reference: Zed's MessageEditor.contents() builds Vec<acp::ContentBlock>
-  // from text and attached images. We do the same here.
-  const handleSubmit = async (message: PromptInputMessage) => {
-    const text = message.text.trim();
-    const files = message.files || [];
-
-    // Allow sending if there's text OR images (like Zed)
-    if ((!text && files.length === 0) || isLoading || !sessionReady) return;
-
-    // Build ContentBlock[] from text and files
-    // Reference: Zed's contents() method builds text chunks and image chunks
-    const contentBlocks: ContentBlock[] = [];
-
-    // Add text content if present
-    if (text) {
-      contentBlocks.push({ type: "text", text });
-    }
-
-    // Convert image files to ImageContent blocks
-    // Reference: Zed's MentionImage stores base64 data + format
-    // Also collect images for display in the user message entry
-    const userImages: UserMessageImage[] = [];
-
-    for (const file of files) {
-      if (file.mediaType?.startsWith("image/") && file.url) {
-        try {
-          console.log("[ChatInterface] Processing image:", {
-            filename: file.filename,
-            mediaType: file.mediaType,
-            urlType: file.url.startsWith("data:") ? "data URL" : file.url.startsWith("blob:") ? "blob URL" : "other",
-            urlLength: file.url.length,
-          });
-
-          // Step 1: Get the image as a Blob/File for compression
-          let originalBlob: Blob;
-          if (file.url.startsWith("data:")) {
-            // Convert data URL to Blob without using fetch()
-            // This is critical for Chrome extensions where fetch(dataUrl) violates CSP
-            console.log("[ChatInterface] Converting data URL to Blob...");
-            originalBlob = dataUrlToBlob(file.url);
-          } else {
-            // Object URL - fetch directly
-            console.log("[ChatInterface] Fetching blob URL...");
-            const response = await fetch(file.url);
-            if (!response.ok) {
-              throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
-            }
-            originalBlob = await response.blob();
-          }
-
-          const originalSizeKB = Math.round(originalBlob.size / 1024);
-          console.log("[ChatInterface] Original image size:", originalSizeKB, "KB");
-
-          // Step 2: Compress the image if it's larger than 2MB
-          let finalBlob: Blob;
-          let finalMimeType: string;
-
-          if (originalBlob.size > 2 * 1024 * 1024) {
-            console.log("[ChatInterface] Compressing image...");
-            const imageFile = new File([originalBlob], file.filename || "image.jpg", {
-              type: originalBlob.type,
-            });
-            finalBlob = await imageCompression(imageFile, IMAGE_COMPRESSION_OPTIONS);
-            finalMimeType = "image/jpeg"; // Compressed images are JPEG
-            const compressedSizeKB = Math.round(finalBlob.size / 1024);
-            console.log("[ChatInterface] Compressed:", originalSizeKB, "KB ->", compressedSizeKB, "KB");
-          } else {
-            // Image is already small enough, use as-is
-            finalBlob = originalBlob;
-            finalMimeType = file.mediaType;
-            console.log("[ChatInterface] Image under 2MB, no compression needed");
-          }
-
-          // Step 3: Convert to base64
-          const base64Data = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const result = reader.result as string;
-              const commaIndex = result.indexOf(",");
-              resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-            };
-            reader.onerror = () => reject(new Error("FileReader error: " + reader.error?.message));
-            reader.readAsDataURL(finalBlob);
-          });
-          console.log("[ChatInterface] Base64 conversion complete, length:", base64Data.length);
-
-          const imageContent: ImageContent = {
-            type: "image",
-            mimeType: finalMimeType,
-            data: base64Data,
-          };
-          contentBlocks.push(imageContent);
-
-          // Reference: Zed stores image data in UserMessage for display
-          // Keep a copy for rendering in the chat history
-          userImages.push({
-            mimeType: finalMimeType,
-            data: base64Data,
-          });
-        } catch (error) {
-          console.error("[ChatInterface] Failed to process image:", {
-            filename: file.filename,
-            mediaType: file.mediaType,
-            url: file.url?.substring(0, 100),
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-    }
-
-    if (contentBlocks.length === 0) return;
-
-    // Add user message as new entry with images
-    // Reference: Zed's UserMessage contains both content and chunks (images)
-    const userEntry: UserMessageEntry = {
-      type: "user_message",
-      id: `user-${Date.now()}`,
-      content: text,
-      images: userImages.length > 0 ? userImages : undefined,
-    };
-    setEntries((prev) => [...prev, userEntry]);
-    setIsLoading(true);
-
-    try {
-      // Reference: Zed's AcpThread.send() forwards Vec<acp::ContentBlock>
-      await client.sendPrompt(contentBlocks);
-    } catch (error) {
-      console.error("[ChatInterface] Failed to send prompt:", error);
-      setIsLoading(false);
-    }
-  };
 
   // Cancel handler - matches Zed's cancel() logic in acp_thread.rs
   // 1. Mark all pending/running/waiting_for_confirmation tool calls as canceled
@@ -805,255 +543,174 @@ export function ChatInterface({ client }: ChatInterfaceProps) {
   }, [client]);
 
   // =============================================================================
-  // Render Helpers
-  // =============================================================================
-
-  // Map tool status to UI state
-  const getToolState = (status: ToolCallStatus) => {
-    switch (status) {
-      case "error":
-        return "output-error" as const;
-      case "running":
-        return "input-available" as const;
-      case "waiting_for_confirmation":
-        return "waiting-for-confirmation" as const;
-      case "rejected":
-        return "rejected" as const;
-      case "canceled":
-        return "output-error" as const; // Show canceled as error state
-      case "complete":
-      default:
-        return "output-available" as const;
-    }
-  };
-
-  // Render a tool call entry
-  const renderToolCall = (entry: ToolCallEntry) => {
-    const tool = entry.toolCall;
-    const toolOutput = formatToolOutput(tool.content, tool.rawOutput);
-    const hasOutput =
-      tool.status !== "running" && tool.status !== "waiting_for_confirmation" && toolOutput !== null;
-
-    return (
-      <Tool
-        key={tool.id}
-        defaultOpen={hasOutput || tool.status === "waiting_for_confirmation"}
-        className={tool.status === "rejected" ? "border-dashed border-orange-500/50" : undefined}
-      >
-        <ToolHeader
-          title={tool.title}
-          type="tool-invocation"
-          state={getToolState(tool.status)}
-        />
-        <ToolContent>
-          {tool.rawInput && <ToolInput input={tool.rawInput} />}
-          {/* Show permission buttons when waiting for confirmation */}
-          {tool.status === "waiting_for_confirmation" && tool.permissionRequest && (
-            <ToolPermissionButtons
-              requestId={tool.permissionRequest.requestId}
-              options={tool.permissionRequest.options}
-              onRespond={handlePermissionResponse}
-            />
-          )}
-          {/* Show output for completed/error states */}
-          {tool.status !== "waiting_for_confirmation" && tool.status !== "rejected" && (
-            <ToolOutput
-              output={toolOutput}
-              errorText={tool.status === "error" ? "Tool execution failed" : undefined}
-            />
-          )}
-        </ToolContent>
-      </Tool>
-    );
-  };
-
-  // Check if we should show thinking indicator
-  const showThinkingIndicator = isLoading && entries.length > 0 &&
-    entries[entries.length - 1]?.type === "user_message";
-
-  const chatStatus = isLoading ? "streaming" : "ready";
-
-  // Find the index of the last user message for scroll-to-last-user-message feature
-  // Reference: Issue #3 - Provide a feature to locate the last human message
-  const lastUserMessageIndex = entries.reduce((lastIndex, entry, index) => {
-    return entry.type === "user_message" ? index : lastIndex;
-  }, -1);
-
-  // =============================================================================
   // Render
   // =============================================================================
-  const hasMessages = entries.length > 0;
+
+  // Collect pending permissions from tool call entries
+  const pendingPermissions: PendingPermission[] = entries
+    .filter((e): e is ToolCallEntry => e.type === "tool_call" && e.toolCall.status === "waiting_for_confirmation" && !!e.toolCall.permissionRequest)
+    .map((e) => ({
+      requestId: e.toolCall.permissionRequest!.requestId,
+      toolName: e.toolCall.title,
+      toolInput: e.toolCall.rawInput || {},
+      description: e.toolCall.title,
+      options: e.toolCall.permissionRequest!.options,
+    }));
+
+  // Handle permission respond for unified PermissionPanel
+  const handlePermissionPanelRespond = useCallback((requestId: string, approved: boolean) => {
+    const kind = approved ? "accept_once" : "reject_once";
+    handlePermissionResponse(requestId, null, kind as PermissionOption["kind"] | null);
+  }, [handlePermissionResponse]);
+
+  // Handle ChatInput submit — convert ChatInputMessage to ContentBlock[]
+  const handleChatInputSubmit = useCallback(async (message: ChatInputMessage) => {
+    const text = message.text.trim();
+    const images = message.images || [];
+
+    if ((!text && images.length === 0) || isLoading || !sessionReady) return;
+
+    const contentBlocks: ContentBlock[] = [];
+
+    if (text) {
+      contentBlocks.push({ type: "text", text });
+    }
+
+    // Convert images to ContentBlock
+    const userImages: UserMessageImage[] = [];
+
+    for (const img of images) {
+      try {
+        const dataUrl = `data:${img.mimeType};base64,${img.data}`;
+        let blob: Blob;
+        if (dataUrl.startsWith("data:")) {
+          blob = dataUrlToBlob(dataUrl);
+        } else {
+          const response = await fetch(dataUrl);
+          blob = await response.blob();
+        }
+
+        let finalBlob: Blob = blob;
+        let finalMimeType = img.mimeType;
+
+        if (blob.size > 2 * 1024 * 1024) {
+          const imageFile = new File([blob], "image.jpg", { type: blob.type });
+          finalBlob = await imageCompression(imageFile, IMAGE_COMPRESSION_OPTIONS);
+          finalMimeType = "image/jpeg";
+        }
+
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            const commaIndex = result.indexOf(",");
+            resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+          };
+          reader.onerror = () => reject(new Error("FileReader error: " + reader.error?.message));
+          reader.readAsDataURL(finalBlob);
+        });
+
+        const imageContent: ImageContent = {
+          type: "image",
+          mimeType: finalMimeType,
+          data: base64Data,
+        };
+        contentBlocks.push(imageContent);
+
+        userImages.push({
+          mimeType: finalMimeType,
+          data: base64Data,
+        });
+      } catch (error) {
+        console.error("[ChatInterface] Failed to process image:", error);
+      }
+    }
+
+    if (contentBlocks.length === 0) return;
+
+    // Add user message entry
+    const userEntry: UserMessageEntry = {
+      type: "user_message",
+      id: `user-${Date.now()}`,
+      content: text,
+      images: userImages.length > 0 ? userImages : undefined,
+    };
+    setEntries((prev) => [...prev, userEntry]);
+    setIsLoading(true);
+
+    try {
+      await client.sendPrompt(contentBlocks);
+    } catch (error) {
+      console.error("[ChatInterface] Failed to send prompt:", error);
+      setIsLoading(false);
+    }
+  }, [isLoading, sessionReady, client]);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Messages area */}
-      <Conversation className="flex-1">
-        <ConversationContent>
-          {!sessionReady ? (
-            <div className="flex items-center justify-center p-4">
-              <Shimmer>Creating session...</Shimmer>
-            </div>
-          ) : entries.length === 0 ? (
-            <ConversationEmptyState
-              title="Start a conversation"
-              description="Type a message below to chat with the ACP agent"
-            />
-          ) : (
-            <>
-              {entries.map((entry, index) => {
-                // Render UserMessage
-                // Reference: Zed's render_image_output() displays images in user messages
-                if (entry.type === "user_message") {
-                  // Mark the last user message with data attribute for scroll-to feature
-                  // Reference: Issue #3 - Provide a feature to locate the last human message
-                  const isLastUserMessage = index === lastUserMessageIndex;
-                  return (
-                    <Message
-                      key={entry.id}
-                      from="user"
-                      {...(isLastUserMessage && { [LAST_USER_MESSAGE_ATTR]: "true" })}
-                    >
-                      <MessageContent>
-                        {/* Show images using MessageAttachment component */}
-                        {entry.images && entry.images.length > 0 && (
-                          <MessageAttachments>
-                            {entry.images.map((img, imgIndex) => (
-                              <MessageAttachment
-                                key={imgIndex}
-                                data={{
-                                  type: "file",
-                                  mediaType: img.mimeType,
-                                  url: `data:${img.mimeType};base64,${img.data}`,
-                                }}
-                              />
-                            ))}
-                          </MessageAttachments>
-                        )}
-                        {/* Show text content if present */}
-                        {entry.content && (
-                          <MessageResponse>{entry.content}</MessageResponse>
-                        )}
-                      </MessageContent>
-                    </Message>
-                  );
-                }
+      {/* Chat messages — unified ChatView */}
+      <ChatView
+        entries={entries}
+        isLoading={isLoading && !sessionReady ? false : isLoading}
+        onPermissionRespond={(requestId, optionId, optionKind) => {
+          handlePermissionResponse(requestId, optionId, optionKind as PermissionOption["kind"] | null);
+        }}
+        emptyTitle={sessionReady ? "开始对话" : undefined}
+        emptyDescription={sessionReady ? "输入消息开始与 ACP agent 聊天" : undefined}
+      />
 
-                // Render AssistantMessage (with chunks)
-                if (entry.type === "assistant_message") {
-                  return (
-                    <Message key={entry.id} from="assistant">
-                      <MessageContent>
-                        {entry.chunks.map((chunk, chunkIndex) => {
-                          if (chunk.type === "thought") {
-                            // Determine if this thought chunk is still streaming
-                            const isLastChunk = chunkIndex === entry.chunks.length - 1;
-                            const isThoughtStreaming = isLoading && isLastChunk;
-                            return (
-                              <Reasoning
-                                key={chunkIndex}
-                                isStreaming={isThoughtStreaming}
-                              >
-                                <ReasoningTrigger />
-                                <ReasoningContent>
-                                  <MessageResponse>{chunk.text}</MessageResponse>
-                                </ReasoningContent>
-                              </Reasoning>
-                            );
-                          }
-                          // Regular message chunk
-                          return <MessageResponse key={chunkIndex}>{chunk.text}</MessageResponse>;
-                        })}
-                      </MessageContent>
-                    </Message>
-                  );
-                }
+      {/* Permission panel — fixed above input */}
+      <PermissionPanel
+        requests={pendingPermissions}
+        onRespond={handlePermissionPanelRespond}
+      />
 
-                // Render ToolCall (standalone entry)
-                if (entry.type === "tool_call") {
-                  return (
-                    <Message key={entry.toolCall.id} from="assistant">
-                      <MessageContent>
-                        {renderToolCall(entry)}
-                      </MessageContent>
-                    </Message>
-                  );
-                }
+      {/* Error banner */}
+      {errorMessage && (
+        <div className="mx-auto max-w-3xl w-full px-4 pb-1">
+          <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-300 flex items-center justify-between">
+            <span>{errorMessage}</span>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="ml-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 flex-shrink-0"
+            >
+              {"\u00D7"}
+            </button>
+          </div>
+        </div>
+      )}
 
-                return null;
-              })}
-
-              {/* Thinking indicator - show when loading after user message */}
-              {showThinkingIndicator && (
-                <Message from="assistant">
-                  <MessageContent>
-                    <Shimmer>Thinking...</Shimmer>
-                  </MessageContent>
-                </Message>
-              )}
-            </>
+      {/* Model selector + New thread + ChatInput */}
+      <div className="flex-shrink-0">
+        <div className="max-w-3xl mx-auto w-full px-3 sm:px-4 pb-1 flex items-center justify-between">
+          <ModelSelectorPopover client={client} />
+          {entries.length > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-text-muted hover:text-brand font-display gap-1"
+                  onClick={handleNewSession}
+                >
+                  <Plus className="h-3 w-3" />
+                  新会话
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>New Thread</TooltipContent>
+            </Tooltip>
           )}
-        </ConversationContent>
-        {/* Scroll navigation buttons */}
-        <ConversationScrollButtons hasUserMessages={lastUserMessageIndex >= 0} />
-      </Conversation>
-
-      {/* Input area */}
-      <div className="border-t p-4">
-        {/* Reference: Zed's MessageEditor conditionally shows attachment UI based on supports_images() */}
-        <PromptInput
-          onSubmit={handleSubmit}
-          accept={supportsImages ? "image/*" : undefined}
-          multiple={supportsImages}
-        >
-          {/* Show attachments header when images are supported */}
-          {supportsImages && (
-            <PromptInputHeader>
-              <PromptInputAttachments>
-                {/* children is called per-file, not with array */}
-                {(file) => <PromptInputAttachment data={file} />}
-              </PromptInputAttachments>
-            </PromptInputHeader>
-          )}
-          <PromptInputTextarea
-            placeholder={sessionReady ? "Type a message..." : "Waiting for session..."}
-            disabled={!sessionReady}
-          />
-          <PromptInputFooter>
-            {/* Left side: Model selector and image button */}
-            <div className="flex items-center gap-1">
-              {/* Reference: Zed's AcpModelSelectorPopover in message editor footer */}
-              <ModelSelectorPopover client={client} />
-              {/* Reference: Zed's add_images_from_picker() shows image picker button only when supported */}
-              {supportsImages && <AddImageButton />}
-            </div>
-            {/* Right side: New thread button (when has messages) and submit */}
-            <div className="flex items-center gap-1">
-              {/* New Thread button - only show when there are messages */}
-              {/* Reference: Zed's new_thread_menu in agent_panel.rs */}
-              {hasMessages && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={handleNewSession}
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span className="sr-only">New Thread</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>New Thread</TooltipContent>
-                </Tooltip>
-              )}
-              <PromptInputSubmit
-                status={chatStatus}
-                disabled={!sessionReady}
-                onClick={isLoading ? handleCancel : undefined}
-              />
-            </div>
-          </PromptInputFooter>
-        </PromptInput>
+        </div>
+        <ChatInput
+          onSubmit={handleChatInputSubmit}
+          isLoading={isLoading}
+          onInterrupt={handleCancel}
+          disabled={!sessionReady}
+          placeholder={sessionReady ? "给 Claude 发送消息…" : "等待会话..."}
+          supportsImages={supportsImages}
+          commands={availableCommands.length > 0 ? availableCommands : undefined}
+        />
       </div>
     </div>
   );

@@ -304,13 +304,26 @@ export interface UserMessageChunkUpdate {
   content: ContentBlock;
 }
 
+// Available command from agent (matches ACP SDK AvailableCommand)
+export interface AvailableCommand {
+  name: string;
+  description: string;
+  input?: { hint: string };
+}
+
+export interface AvailableCommandsUpdate {
+  sessionUpdate: "available_commands_update";
+  availableCommands: AvailableCommand[];
+}
+
 export type SessionUpdate =
   | AgentMessageChunkUpdate
   | ToolCallUpdate
   | ToolCallStatusUpdate
   | AgentThoughtChunkUpdate
   | PlanUpdate
-  | UserMessageChunkUpdate;
+  | UserMessageChunkUpdate
+  | AvailableCommandsUpdate;
 
 // Connection state
 export type ConnectionState =

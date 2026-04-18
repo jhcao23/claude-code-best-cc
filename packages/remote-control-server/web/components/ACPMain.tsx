@@ -1,127 +1,241 @@
-import { useState, useRef, useCallback } from "react";
-import { MessageSquare, History } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import type { ACPClient } from "../src/acp/client";
 import type { AgentSessionInfo } from "../src/acp/types";
 import { ChatInterface } from "./ChatInterface";
-import { ThreadHistory } from "./ThreadHistory";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { cn } from "../src/lib/utils";
+import { MessageSquare, Plus, PanelLeftClose, PanelLeft } from "lucide-react";
 
 interface ACPMainProps {
   client: ACPClient;
 }
 
-const TAB_ORDER = ["chat", "history"] as const;
-type TabValue = (typeof TAB_ORDER)[number];
-
 /**
- * Main container component that provides tabs for Chat and History.
- * Reference: Zed's AgentPanel with ThreadHistory integration
- * This component should be rendered after successful connection.
+ * Main container — Anthropic sidebar + chat layout.
+ * Sidebar: sectioned by recency, orange active state, warm raised bg.
  */
 export function ACPMain({ client }: ACPMainProps) {
-  const [activeTab, setActiveTab] = useState<TabValue>("chat");
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Handle session selection from history
-  // Reference: Zed's connection_view.rs line 616-631
-  // Zed prioritizes load_session (with history), falls back to resume_session (without history)
+  // Handle session selection
   const handleSelectSession = useCallback(async (session: AgentSessionInfo) => {
     try {
       if (client.supportsLoadSession) {
-        // load_session replays full history
         await client.loadSession({ sessionId: session.sessionId, cwd: session.cwd });
       } else if (client.supportsResumeSession) {
-        // resume_session starts without replaying history
         await client.resumeSession({ sessionId: session.sessionId, cwd: session.cwd });
       } else {
         throw new Error("Loading or resuming sessions is not supported by this agent.");
       }
-      // Switch to chat tab after loading
-      setActiveTab("chat");
     } catch (error) {
       console.error("Failed to load/resume session:", error);
     }
   }, [client]);
 
-  // Check if an element or its ancestors can scroll horizontally
-  const isInHorizontalScrollableArea = useCallback((element: HTMLElement | null): boolean => {
-    while (element) {
-      if (element.scrollWidth > element.clientWidth) {
-        const style = window.getComputedStyle(element);
-        const overflowX = style.overflowX;
-        if (overflowX === "auto" || overflowX === "scroll") {
-          return true;
-        }
-      }
-      element = element.parentElement;
-    }
-    return false;
-  }, []);
+  return (
+    <div className="flex h-full w-full">
+      {/* 侧边栏 — Anthropic warm sidebar, hidden on mobile */}
+      <div
+        className={cn(
+          "hidden md:flex flex-col border-r border-border bg-surface-1 transition-all duration-200 flex-shrink-0",
+          sidebarCollapsed ? "w-12" : "w-64",
+        )}
+      >
+        {/* 头部 */}
+        <div className="flex items-center justify-between px-3 py-3 border-b border-border">
+          {!sidebarCollapsed && (
+            <span className="text-xs font-display font-medium text-text-muted uppercase tracking-wider px-1">会话</span>
+          )}
+          <div className="flex items-center gap-0.5">
+            {!sidebarCollapsed && (
+              <button
+                type="button"
+                onClick={() => {
+                  // ChatInterface handles new session internally
+                }}
+                className="h-7 w-7 flex items-center justify-center rounded-lg text-text-muted hover:text-brand hover:bg-brand/10 transition-colors"
+                title="新会话"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="h-7 w-7 flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
+            >
+              {sidebarCollapsed ? (
+                <PanelLeft className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        </div>
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // Don't track swipe if starting in a horizontally scrollable area
-    if (isInHorizontalScrollableArea(e.target as HTMLElement)) {
-      touchStartX.current = null;
-      touchStartY.current = null;
+        {/* 会话列表 */}
+        {!sidebarCollapsed && (
+          <div className="flex-1 overflow-y-auto">
+            <SidebarSessionList client={client} onSelectSession={handleSelectSession} />
+          </div>
+        )}
+      </div>
+
+      {/* 聊天区域 */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <ChatInterface client={client} />
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// 侧边栏会话列表 — Anthropic 分段式（今天/昨天/更早）
+// =============================================================================
+
+function SidebarSessionList({
+  client,
+  onSelectSession,
+}: {
+  client: ACPClient;
+  onSelectSession: (session: AgentSessionInfo) => void;
+}) {
+  const [sessions, setSessions] = useState<AgentSessionInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const loadSessions = useCallback(async () => {
+    if (!client.supportsSessionList) {
+      setLoading(false);
       return;
     }
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  }, [isInHorizontalScrollableArea]);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (touchStartX.current === null || touchStartY.current === null) return;
-
-    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-
-    // Only trigger if horizontal swipe is dominant and significant
-    if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
-      const currentIndex = TAB_ORDER.indexOf(activeTab);
-      if (deltaX < 0 && currentIndex < TAB_ORDER.length - 1) {
-        // Swipe left → next tab
-        setActiveTab(TAB_ORDER[currentIndex + 1]);
-      } else if (deltaX > 0 && currentIndex > 0) {
-        // Swipe right → previous tab
-        setActiveTab(TAB_ORDER[currentIndex - 1]);
-      }
+    setLoading(true);
+    try {
+      const response = await client.listSessions();
+      setSessions(response.sessions);
+    } catch (err) {
+      console.warn("[SidebarSessionList] Failed to load:", err);
+    } finally {
+      setLoading(false);
     }
+  }, [client]);
 
-    touchStartX.current = null;
-    touchStartY.current = null;
-  }, [activeTab]);
+  useEffect(() => {
+    if (client.getState() === "connected" && client.supportsSessionList) {
+      loadSessions();
+    }
+  }, [client, loadSessions]);
+
+  useEffect(() => {
+    const handler = (state: string) => {
+      if (state === "connected") {
+        setTimeout(loadSessions, 200);
+      }
+    };
+    client.setConnectionStateHandler(handler);
+    return () => client.removeConnectionStateHandler(handler);
+  }, [client, loadSessions]);
+
+  useEffect(() => {
+    const interval = setInterval(loadSessions, 10000);
+    return () => clearInterval(interval);
+  }, [loadSessions]);
+
+  const sorted = useMemo(
+    () =>
+      [...sessions].sort((a, b) => {
+        const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return dateB - dateA;
+      }),
+    [sessions],
+  );
+
+  if (loading && sessions.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <span className="text-xs text-text-muted font-display">加载中...</span>
+      </div>
+    );
+  }
+
+  if (sessions.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <span className="text-xs text-text-muted font-display">暂无会话</span>
+      </div>
+    );
+  }
+
+  // 按日期分组
+  const groups = groupByRecency(sorted);
 
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={(v) => setActiveTab(v as TabValue)}
-      className="flex flex-col h-full w-full"
-    >
-      <TabsList className="mx-2 mt-2 self-center">
-        <TabsTrigger value="chat" className="gap-1.5">
-          <MessageSquare className="h-4 w-4" />
-          <span>Chat</span>
-        </TabsTrigger>
-        <TabsTrigger value="history" className="gap-1.5">
-          <History className="h-4 w-4" />
-          <span>History</span>
-        </TabsTrigger>
-      </TabsList>
-
-      <div
-        className="flex-1 flex flex-col min-h-0 overflow-hidden"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <TabsContent value="chat" forceMount className="w-full h-full m-0 max-w-2xl mx-auto">
-          <ChatInterface client={client} />
-        </TabsContent>
-
-        <TabsContent value="history" forceMount className="flex flex-col h-full m-0 max-w-2xl mx-auto w-full">
-          <ThreadHistory client={client} onSelectSession={handleSelectSession} />
-        </TabsContent>
-      </div>
-    </Tabs>
+    <nav className="py-2" aria-label="历史会话">
+      {groups.map((group) => (
+        <div key={group.label}>
+          <div className="px-3 py-1.5">
+            <span className="text-[10px] font-display font-medium uppercase tracking-widest text-text-muted">
+              {group.label}
+            </span>
+          </div>
+          {group.sessions.map((session) => (
+            <button
+              key={session.sessionId}
+              type="button"
+              onClick={() => {
+                setActiveId(session.sessionId);
+                onSelectSession(session);
+              }}
+              className={cn(
+                "w-full flex items-center gap-2 px-3 py-2 text-left transition-colors",
+                session.sessionId === activeId
+                  ? "bg-brand/10 text-text-primary border-l-2 border-l-brand"
+                  : "text-text-secondary hover:bg-surface-1/50 hover:text-text-primary border-l-2 border-l-transparent",
+              )}
+              title={session.title || session.sessionId}
+            >
+              <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
+              <span className="text-sm font-display truncate">
+                {session.title && session.title.trim() ? session.title : "新会话"}
+              </span>
+            </button>
+          ))}
+        </div>
+      ))}
+    </nav>
   );
+}
+
+// =============================================================================
+// 按日期分组：今天 / 昨天 / 更早
+// =============================================================================
+
+interface SessionGroup {
+  label: string;
+  sessions: AgentSessionInfo[];
+}
+
+function groupByRecency(sessions: AgentSessionInfo[]): SessionGroup[] {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+
+  const groups: SessionGroup[] = [
+    { label: "今天", sessions: [] },
+    { label: "昨天", sessions: [] },
+    { label: "更早", sessions: [] },
+  ];
+
+  for (const session of sessions) {
+    const date = session.updatedAt ? new Date(session.updatedAt) : new Date(0);
+    if (date >= today) {
+      groups[0].sessions.push(session);
+    } else if (date >= yesterday) {
+      groups[1].sessions.push(session);
+    } else {
+      groups[2].sessions.push(session);
+    }
+  }
+
+  return groups.filter((g) => g.sessions.length > 0);
 }

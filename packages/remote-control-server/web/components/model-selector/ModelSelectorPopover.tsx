@@ -31,10 +31,8 @@ export function ModelSelectorPopover({
     isLoading,
   } = useModels(client);
 
-  // Hide when agent doesn't support model selection (matches Zed behavior)
-  if (!supportsModelSelection) {
-    return null;
-  }
+  // Always show the button — disable dropdown when no models available
+  const hasModels = supportsModelSelection && availableModels.length > 0;
 
   // Check if we're on a mobile device (touch-only)
   const isMobile = typeof window !== "undefined" &&
@@ -51,13 +49,13 @@ export function ModelSelectorPopover({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={hasModels ? setOpen : undefined}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
           size="sm"
           className="gap-1.5 text-muted-foreground hover:text-foreground h-7 px-2"
-          disabled={isLoading}
+          disabled={!hasModels || isLoading}
         >
           {isLoading ? (
             <Loader2 className="h-3 w-3 animate-spin" />

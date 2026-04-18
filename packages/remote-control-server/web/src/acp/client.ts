@@ -17,6 +17,7 @@ import type {
   SessionUpdate,
   SessionModelState,
   ModelInfo,
+  AvailableCommand,
 } from "./types";
 
 /**
@@ -41,8 +42,10 @@ export type PermissionRequestHandler = (request: PermissionRequestPayload) => vo
 export type BrowserToolCallHandler = (
   params: BrowserToolParams,
 ) => Promise<BrowserToolResult>;
+export type ErrorMessageHandler = (message: string) => void;
 export type ModelChangedHandler = (modelId: string) => void;
 export type ModelStateChangedHandler = (state: SessionModelState | null) => void;
+export type AvailableCommandsChangedHandler = (commands: AvailableCommand[]) => void;
 // Handler for session loaded/resumed events
 export type SessionLoadedHandler = (sessionId: string) => void;
 // Handler fired before switching the active session.
@@ -64,22 +67,25 @@ export class ACPClient {
   private _promptCapabilities: PromptCapabilities | null = null;
   // Reference: Zed stores model state from NewSessionResponse
   private _modelState: SessionModelState | null = null;
+  private _availableCommands: AvailableCommand[] = [];
   private onModelChanged: ModelChangedHandler | null = null;
   private onModelStateChanged: ModelStateChangedHandler | null = null;
+  private onAvailableCommandsChanged: AvailableCommandsChangedHandler | null = null;
   private onSessionLoaded: SessionLoadedHandler | null = null;
   private onSessionSwitching: SessionSwitchingHandler | null = null;
 
-  private onConnectionStateChange: ConnectionStateHandler | null = null;
+  private onConnectionStateChange: Set<ConnectionStateHandler> = new Set();
   private onSessionUpdate: SessionUpdateHandler | null = null;
   private onSessionCreated: SessionCreatedHandler | null = null;
   private onPromptComplete: PromptCompleteHandler | null = null;
   private onPermissionRequest: PermissionRequestHandler | null = null;
   private onBrowserToolCall: BrowserToolCallHandler | null = null;
+  private onErrorMessage: ErrorMessageHandler | null = null;
 
   // Pending session operations
-  private pendingSessionList: { resolve: (response: ListSessionsResponse) => void; reject: (err: Error) => void } | null = null;
-  private pendingSessionLoad: { resolve: (sessionId: string) => void; reject: (err: Error) => void } | null = null;
-  private pendingSessionResume: { resolve: (sessionId: string) => void; reject: (err: Error) => void } | null = null;
+  private pendingSessionList: { resolve: (response: ListSessionsResponse) => void; reject: (err: Error) => void; timer: ReturnType<typeof setTimeout> } | null = null;
+  private pendingSessionLoad: { resolve: (sessionId: string) => void; reject: (err: Error) => void; timer: ReturnType<typeof setTimeout> } | null = null;
+  private pendingSessionResume: { resolve: (sessionId: string) => void; reject: (err: Error) => void; timer: ReturnType<typeof setTimeout> } | null = null;
 
   private connectResolve: ((value: void) => void) | null = null;
   private connectReject: ((error: Error) => void) | null = null;
@@ -101,7 +107,11 @@ export class ACPClient {
   }
 
   setConnectionStateHandler(handler: ConnectionStateHandler): void {
-    this.onConnectionStateChange = handler;
+    this.onConnectionStateChange.add(handler);
+  }
+
+  removeConnectionStateHandler(handler: ConnectionStateHandler): void {
+    this.onConnectionStateChange.delete(handler);
   }
 
   setSessionUpdateHandler(handler: SessionUpdateHandler): void {
@@ -131,6 +141,11 @@ export class ACPClient {
     handler(this._modelState);
   }
 
+  setAvailableCommandsChangedHandler(handler: AvailableCommandsChangedHandler): void {
+    this.onAvailableCommandsChanged = handler;
+    handler(this._availableCommands);
+  }
+
   setPermissionRequestHandler(handler: PermissionRequestHandler): void {
     this.onPermissionRequest = handler;
   }
@@ -139,13 +154,19 @@ export class ACPClient {
     this.onBrowserToolCall = handler;
   }
 
+  setErrorMessageHandler(handler: ErrorMessageHandler): void {
+    this.onErrorMessage = handler;
+  }
+
   setSessionSwitchingHandler(handler: SessionSwitchingHandler | null): void {
     this.onSessionSwitching = handler;
   }
 
   private setState(state: ConnectionState, error?: string): void {
     this.connectionState = state;
-    this.onConnectionStateChange?.(state, error);
+    for (const handler of this.onConnectionStateChange) {
+      handler(state, error);
+    }
   }
 
   getState(): ConnectionState {
@@ -173,6 +194,13 @@ export class ACPClient {
    */
   get modelState(): SessionModelState | null {
     return this._modelState;
+  }
+
+  /**
+   * Get the list of available commands from the agent.
+   */
+  get availableCommands(): AvailableCommand[] {
+    return this._availableCommands;
   }
 
   /**
@@ -231,8 +259,14 @@ export class ACPClient {
   }
 
   async connect(): Promise<void> {
+    // Clean up any existing connection first
     if (this.ws) {
-      this.disconnect();
+      const oldWs = this.ws;
+      this.ws = null;
+      try { oldWs.close(); } catch { /* ignore */ }
+      this.stopHeartbeat();
+      this.connectResolve = null;
+      this.connectReject = null;
     }
 
     this.setState("connecting");
@@ -330,18 +364,35 @@ export class ACPClient {
         break;
 
       case "error":
-        console.error("[ACPClient] Error:", response.payload.message);
+        console.error("[ACPClient] Error:", response.payload);
+        const errorMsg = response.payload?.message || JSON.stringify(response.payload);
         this.pendingSessionTarget = null;
-        // Reject pending session operations if any
-        this.pendingSessionList?.reject(new Error(response.payload.message));
-        this.pendingSessionList = null;
-        this.pendingSessionLoad?.reject(new Error(response.payload.message));
-        this.pendingSessionLoad = null;
-        this.pendingSessionResume?.reject(new Error(response.payload.message));
-        this.pendingSessionResume = null;
-        this.connectReject?.(new Error(response.payload.message));
-        this.connectResolve = null;
-        this.connectReject = null;
+        // Reject pending session operations if any (clear their timers)
+        if (this.pendingSessionList) {
+          clearTimeout(this.pendingSessionList.timer);
+          this.pendingSessionList.reject(new Error(errorMsg));
+          this.pendingSessionList = null;
+        }
+        if (this.pendingSessionLoad) {
+          clearTimeout(this.pendingSessionLoad.timer);
+          this.pendingSessionLoad.reject(new Error(errorMsg));
+          this.pendingSessionLoad = null;
+        }
+        if (this.pendingSessionResume) {
+          clearTimeout(this.pendingSessionResume.timer);
+          this.pendingSessionResume.reject(new Error(errorMsg));
+          this.pendingSessionResume = null;
+        }
+        // If during connect phase, reject the connect promise
+        if (this.connectReject) {
+          this.connectReject(new Error(errorMsg));
+          this.connectResolve = null;
+          this.connectReject = null;
+        } else {
+          // After connected, notify UI about the error
+          console.error("[ACPClient] Agent error:", errorMsg);
+          this.onErrorMessage?.(errorMsg);
+        }
         break;
 
       case "session_created":
@@ -360,8 +411,11 @@ export class ACPClient {
       // Session history responses - Reference: Zed's AgentSessionList
       case "session_list":
         console.log("[ACPClient] Session list received:", response.payload.sessions.length, "sessions");
-        this.pendingSessionList?.resolve(response.payload);
-        this.pendingSessionList = null;
+        if (this.pendingSessionList) {
+          clearTimeout(this.pendingSessionList.timer);
+          this.pendingSessionList.resolve(response.payload);
+          this.pendingSessionList = null;
+        }
         break;
 
       case "session_loaded":
@@ -370,8 +424,11 @@ export class ACPClient {
         this._promptCapabilities = response.payload.promptCapabilities ?? null;
         this._modelState = response.payload.models ?? null;
         console.log("[ACPClient] Session loaded:", response.payload.sessionId);
-        this.pendingSessionLoad?.resolve(response.payload.sessionId);
-        this.pendingSessionLoad = null;
+        if (this.pendingSessionLoad) {
+          clearTimeout(this.pendingSessionLoad.timer);
+          this.pendingSessionLoad.resolve(response.payload.sessionId);
+          this.pendingSessionLoad = null;
+        }
         this.onSessionLoaded?.(response.payload.sessionId);
         this.onModelStateChanged?.(this._modelState);
         break;
@@ -382,13 +439,24 @@ export class ACPClient {
         this._promptCapabilities = response.payload.promptCapabilities ?? null;
         this._modelState = response.payload.models ?? null;
         console.log("[ACPClient] Session resumed:", response.payload.sessionId);
-        this.pendingSessionResume?.resolve(response.payload.sessionId);
-        this.pendingSessionResume = null;
+        if (this.pendingSessionResume) {
+          clearTimeout(this.pendingSessionResume.timer);
+          this.pendingSessionResume.resolve(response.payload.sessionId);
+          this.pendingSessionResume = null;
+        }
         this.onSessionLoaded?.(response.payload.sessionId);
         this.onModelStateChanged?.(this._modelState);
         break;
 
       case "session_update":
+        // Intercept available_commands_update for internal state
+        const updateType = response.payload.update?.sessionUpdate;
+        console.log("[ACPClient] session_update type:", updateType, "payload:", response.payload);
+        if (updateType === "available_commands_update") {
+          this._availableCommands = response.payload.update.availableCommands;
+          console.log("[ACPClient] Available commands updated:", this._availableCommands.length, "commands");
+          this.onAvailableCommandsChanged?.(this._availableCommands);
+        }
         this.onSessionUpdate?.(response.payload.sessionId, response.payload.update);
         break;
 
@@ -569,22 +637,20 @@ export class ACPClient {
       throw new Error("Listing sessions is not supported by this agent");
     }
     return new Promise((resolve, reject) => {
-      this.pendingSessionList = { resolve, reject };
+      const timer = setTimeout(() => {
+        if (this.pendingSessionList) {
+          this.pendingSessionList = null;
+          reject(new Error("List sessions timed out"));
+        }
+      }, 30000);
+      this.pendingSessionList = { resolve, reject, timer };
       try {
         this.send({ type: "list_sessions", payload: request });
       } catch (err) {
+        clearTimeout(timer);
         this.pendingSessionList = null;
         reject(err);
-        return;
       }
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        if (this.pendingSessionList) {
-          const pending = this.pendingSessionList;
-          this.pendingSessionList = null;
-          pending.reject(new Error("List sessions timed out"));
-        }
-      }, 30000);
     });
   }
 
@@ -600,24 +666,22 @@ export class ACPClient {
     return new Promise((resolve, reject) => {
       this.pendingSessionTarget = request.sessionId;
       this.onSessionSwitching?.(request.sessionId);
-      this.pendingSessionLoad = { resolve, reject };
+      const timer = setTimeout(() => {
+        if (this.pendingSessionLoad) {
+          this.pendingSessionTarget = null;
+          this.pendingSessionLoad = null;
+          reject(new Error("Load session timed out"));
+        }
+      }, 60000);
+      this.pendingSessionLoad = { resolve, reject, timer };
       try {
         this.send({ type: "load_session", payload: request });
       } catch (err) {
+        clearTimeout(timer);
         this.pendingSessionTarget = null;
         this.pendingSessionLoad = null;
         reject(err);
-        return;
       }
-      // Timeout after 60 seconds (loading may take time for large sessions)
-      setTimeout(() => {
-        if (this.pendingSessionLoad) {
-          this.pendingSessionTarget = null;
-          const pending = this.pendingSessionLoad;
-          this.pendingSessionLoad = null;
-          pending.reject(new Error("Load session timed out"));
-        }
-      }, 60000);
     });
   }
 
@@ -633,24 +697,22 @@ export class ACPClient {
     return new Promise((resolve, reject) => {
       this.pendingSessionTarget = request.sessionId;
       this.onSessionSwitching?.(request.sessionId);
-      this.pendingSessionResume = { resolve, reject };
+      const timer = setTimeout(() => {
+        if (this.pendingSessionResume) {
+          this.pendingSessionTarget = null;
+          this.pendingSessionResume = null;
+          reject(new Error("Resume session timed out"));
+        }
+      }, 30000);
+      this.pendingSessionResume = { resolve, reject, timer };
       try {
         this.send({ type: "resume_session", payload: request });
       } catch (err) {
+        clearTimeout(timer);
         this.pendingSessionTarget = null;
         this.pendingSessionResume = null;
         reject(err);
-        return;
       }
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        if (this.pendingSessionResume) {
-          this.pendingSessionTarget = null;
-          const pending = this.pendingSessionResume;
-          this.pendingSessionResume = null;
-          pending.reject(new Error("Resume session timed out"));
-        }
-      }, 30000);
     });
   }
 
@@ -667,7 +729,8 @@ export class ACPClient {
 
     if (this.ws) {
       try {
-        this.send({ type: "disconnect" });
+        // Don't send disconnect to acp-link — keep agent process alive for reconnection
+        // Just close the WebSocket
       } catch {
         // Ignore send errors during disconnect
       }
@@ -679,17 +742,27 @@ export class ACPClient {
     this.pendingSessionTarget = null;
     this._modelState = null;
     this._agentCapabilities = null;
+    this._availableCommands = [];
     // Notify model state subscribers that session is gone
     this.onModelStateChanged?.(null);
+    this.onAvailableCommandsChanged?.([]);
 
-    // Reject all pending operations before clearing
+    // Reject all pending operations before clearing (clear their timers too)
     const disconnectError = new Error("Disconnected");
-    // Reject pending session operations
-    this.pendingSessionList?.reject(disconnectError);
-    this.pendingSessionList = null;
-    this.pendingSessionLoad?.reject(disconnectError);
-    this.pendingSessionLoad = null;
-    this.pendingSessionResume?.reject(disconnectError);
-    this.pendingSessionResume = null;
+    if (this.pendingSessionList) {
+      clearTimeout(this.pendingSessionList.timer);
+      this.pendingSessionList.reject(disconnectError);
+      this.pendingSessionList = null;
+    }
+    if (this.pendingSessionLoad) {
+      clearTimeout(this.pendingSessionLoad.timer);
+      this.pendingSessionLoad.reject(disconnectError);
+      this.pendingSessionLoad = null;
+    }
+    if (this.pendingSessionResume) {
+      clearTimeout(this.pendingSessionResume.timer);
+      this.pendingSessionResume.reject(disconnectError);
+      this.pendingSessionResume = null;
+    }
   }
 }

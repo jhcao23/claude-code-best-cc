@@ -47,10 +47,10 @@ export function ToolPermissionButtons({ requestId, options, onRespond, className
   };
 
   return (
-    <div className={cn("p-3 border-t border-yellow-500/30 bg-yellow-50/50 dark:bg-yellow-950/10", className)}>
+    <div className={cn("p-3 border-t border-warning-border/30 border-l-3 border-l-warning-border bg-warning-bg/50", className)}>
       <div className="flex items-center gap-2 mb-2">
-        <ShieldAlertIcon className="size-4 text-yellow-600 dark:text-yellow-500" />
-        <span className="text-xs font-medium text-yellow-800 dark:text-yellow-200">
+        <ShieldAlertIcon className="size-4 text-warning-text" />
+        <span className="text-xs font-medium text-warning-text">
           Permission Required
         </span>
       </div>

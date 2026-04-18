@@ -24,26 +24,26 @@ export function PermissionPromptView({
   const inputStr = typeof toolInput === "string" ? toolInput : JSON.stringify(toolInput, null, 2);
 
   return (
-    <div className="rounded-xl border border-status-warning/30 bg-surface-1 p-4">
+    <div className="rounded-xl border border-warning-border/30 border-l-3 border-l-warning-border bg-surface-1 p-4">
       <div className="mb-2 flex items-center gap-2">
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-status-warning/15 text-status-warning">
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-warning-border/15 text-warning-text">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M6 1L11 10H1L6 1Z" fill="currentColor" />
           </svg>
         </span>
-        <span className="text-sm font-semibold text-status-warning">Permission Request</span>
+        <span className="text-sm font-semibold text-warning-text">Permission Request</span>
       </div>
       {description && <div className="mb-2 text-sm text-text-secondary">{esc(description)}</div>}
       <div className="mb-2 font-mono text-xs font-bold text-text-primary">{esc(toolName)}</div>
       {toolName !== "AskUserQuestion" && (
-        <pre className="mb-3 max-h-40 overflow-auto rounded-lg bg-tool-card p-2 text-xs text-text-secondary font-mono">
+        <pre className="mb-3 max-h-40 overflow-auto rounded-lg bg-surface-1 p-2 text-xs text-text-secondary font-mono">
           {truncate(inputStr, 500)}
         </pre>
       )}
       <div className="flex gap-2">
         <button
           onClick={onApprove}
-          className="rounded-lg bg-status-active/20 px-4 py-2 text-sm font-medium text-status-active hover:bg-status-active/30 transition-colors"
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-light transition-colors"
         >
           Approve
         </button>
