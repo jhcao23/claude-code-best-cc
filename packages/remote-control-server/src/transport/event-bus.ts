@@ -85,3 +85,23 @@ export function removeEventBus(sessionId: string) {
 export function getAllEventBuses(): Map<string, EventBus> {
   return buses;
 }
+
+/** Global registry of per-channel-group ACP event buses */
+const acpBuses = new Map<string, EventBus>();
+
+export function getAcpEventBus(channelGroupId: string): EventBus {
+  let bus = acpBuses.get(channelGroupId);
+  if (!bus) {
+    bus = new EventBus();
+    acpBuses.set(channelGroupId, bus);
+  }
+  return bus;
+}
+
+export function removeAcpEventBus(channelGroupId: string) {
+  const bus = acpBuses.get(channelGroupId);
+  if (bus) {
+    bus.close();
+    acpBuses.delete(channelGroupId);
+  }
+}

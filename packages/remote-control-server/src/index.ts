@@ -4,15 +4,20 @@ import { logger } from "hono/logger";
 import { serveStatic } from "hono/bun";
 import { config } from "./config";
 import { closeAllConnections } from "./transport/ws-handler";
+import { closeAllAcpConnections } from "./transport/acp-ws-handler";
+import { closeAllRelayConnections } from "./transport/acp-relay-handler";
 import { startDisconnectMonitor } from "./services/disconnect-monitor";
 import { dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import acpRoutes from "./routes/acp";
 
 // Routes
 import v1Environments from "./routes/v1/environments";
 import v1EnvironmentsWork from "./routes/v1/environments.work";
 import v1Sessions from "./routes/v1/sessions";
-import v1SessionIngress, { websocket } from "./routes/v1/session-ingress";
+import v1SessionIngress from "./routes/v1/session-ingress";
+import { websocket } from "./transport/ws-shared";
 import v2CodeSessions from "./routes/v2/code-sessions";
 import v2Worker from "./routes/v2/worker";
 import v2WorkerEventsStream from "./routes/v2/worker-events-stream";
@@ -33,9 +38,11 @@ app.use("/web/*", cors());
 // Health check
 app.get("/health", (c) => c.json({ status: "ok", version: config.version }));
 
-// Static files — serve web/ directory under /code path
+// Static files — serve built web UI under /code path
+// Uses web/dist/ if it exists (production), otherwise falls back to web/ (dev/fallback)
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const webDir = resolve(__dirname, "../web");
+const distDir = resolve(__dirname, "../web/dist");
+const webDir = existsSync(resolve(distDir, "index.html")) ? distDir : resolve(__dirname, "../web");
 
 const stripCodePrefix = (p: string) => p.replace(/^\/code/, "");
 
@@ -70,6 +77,17 @@ app.route("/web", webSessions);
 app.route("/web", webControl);
 app.route("/web", webEnvironments);
 
+// ACP protocol routes
+console.log("[RCS] ACP support enabled");
+app.route("/acp", acpRoutes);
+
+// ACP frontend SPA — serve acp.html for /acp/ and /acp/* (after API routes)
+const stripAcpPrefix = (p: string) => p.replace(/^\/acp/, "");
+app.use("/acp/assets/*", serveStatic({ root: webDir, rewriteRequestPath: stripAcpPrefix }));
+app.get("/acp", serveStatic({ root: webDir, path: "acp.html" }));
+app.get("/acp/", serveStatic({ root: webDir, path: "acp.html" }));
+app.get("/acp/agent/:agentId", serveStatic({ root: webDir, path: "acp.html" }));
+
 const port = config.port;
 const host = config.host;
 
@@ -98,6 +116,8 @@ export default {
 async function gracefulShutdown(signal: string) {
   console.log(`\n[RCS] Received ${signal}, shutting down...`);
   closeAllConnections();
+  closeAllAcpConnections();
+  closeAllRelayConnections();
   process.exit(0);
 }
 

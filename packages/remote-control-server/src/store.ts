@@ -325,6 +325,43 @@ export function storeUpdateWorkItem(id: string, patch: Partial<Pick<WorkItemReco
   return true;
 }
 
+// ---------- ACP Agent (reuses EnvironmentRecord with workerType="acp") ----------
+
+/** List all ACP agents (environments with workerType="acp") */
+export function storeListAcpAgents(): EnvironmentRecord[] {
+  return [...environments.values()].filter((e) => e.workerType === "acp");
+}
+
+/** List ACP agents by channel group (stored in bridgeId field) */
+export function storeListAcpAgentsByChannelGroup(channelGroupId: string): EnvironmentRecord[] {
+  return [...environments.values()].filter(
+    (e) => e.workerType === "acp" && e.bridgeId === channelGroupId,
+  );
+}
+
+/** List online ACP agents */
+export function storeListOnlineAcpAgents(): EnvironmentRecord[] {
+  return [...environments.values()].filter(
+    (e) => e.workerType === "acp" && e.status === "active",
+  );
+}
+
+/** Mark an ACP agent as offline */
+export function storeMarkAcpAgentOffline(id: string): boolean {
+  const rec = environments.get(id);
+  if (!rec || rec.workerType !== "acp") return false;
+  Object.assign(rec, { status: "offline", updatedAt: new Date() });
+  return true;
+}
+
+/** Mark an ACP agent as online (on reconnect) */
+export function storeMarkAcpAgentOnline(id: string): boolean {
+  const rec = environments.get(id);
+  if (!rec || rec.workerType !== "acp") return false;
+  Object.assign(rec, { status: "active", lastPollAt: new Date(), updatedAt: new Date() });
+  return true;
+}
+
 // ---------- Reset (for tests) ----------
 
 export function storeReset() {
