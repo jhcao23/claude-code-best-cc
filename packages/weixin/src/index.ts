@@ -96,13 +96,13 @@ export type {
 
 // Permission state
 export {
-  ChannelPermissionRequestParams,
   setActivePermissionChat,
   getActivePermissionChat,
   savePendingPermission,
   consumePendingPermission,
 } from './permissions.js'
 export type {
+  ChannelPermissionRequestParams,
   PendingPermissionRequest,
   ActivePermissionChat,
 } from './permissions.js'
