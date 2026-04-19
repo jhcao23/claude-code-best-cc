@@ -1,197 +1,166 @@
 ---
-title: "Agentic Loop：AI 自主循环的核心机制"
-description: "深入解析 Claude Code 的 query() 异步生成器循环——从流式 API 调用、工具并行执行、上下文压缩、错误恢复到终止条件的完整状态机，基于 src/query.ts 的源码级分析。"
-keywords: ["Agentic Loop", "query loop", "tool_use", "状态机", "auto-compact", "streaming", "recovery"]
-sourceRef: "3ec5675 (2026-04-08)"
+title: "Agent Loop"
+description: "理解 Claude Code 的核心循环机制——AI 如何自主决定工具调用、处理错误、管理上下文，直到任务完成。"
+keywords: ["Agentic Loop", "tool_use", "状态机", "auto-compact", "streaming"]
 ---
-
-{/* 本章目标：基于 src/query.ts 揭示 Agentic Loop 的完整状态机 */}
 
 ## 什么是 Agentic Loop
 
-传统聊天机器人：你问一句，它答一句。  
+传统聊天机器人：你问一句，它答一句。
 Claude Code 不一样：你说一个需求，它可能连续执行十几步操作才给你最终结果。
 
-这背后的机制叫做 **Agentic Loop**（智能体循环），核心实现在 `src/query.ts` 的 `queryLoop()` 异步生成器函数。它是一个 `while(true)` 无限循环，每次迭代代表一次"思考→行动→观察"周期。
+这背后的机制叫做 **Agentic Loop**（智能体循环）。它是一个"思考→行动→观察"的不断循环，直到任务完成或遇到终止条件。
 
 <Frame caption="Agentic Loop 循环示意">
   <img src="/docs/images/agentic-loop.png" alt="Agentic Loop 循环图" />
 </Frame>
 
-## 循环的完整结构
+### 为什么需要循环而非一次回答
 
-`queryLoop()` 的每次迭代（`src/query.ts` 中 `while(true)` 主循环）包含以下阶段：
+因为软件工程任务本质上是**探索性**的。AI 不可能在第一步就知道所有信息：
 
-### 阶段 1：上下文预处理（Pre-Processing Pipeline）
+- 它需要先读代码才能知道怎么改
+- 它需要先运行命令才能知道结果
+- 它需要先搜索才能找到相关文件
+- 它需要先修改才能验证是否正确
 
-在调用 API 之前，依次执行 5 个压缩/优化步骤：
+每一步工具执行都产生**真实信息**——命令输出、文件内容、错误信息——这些是 AI 在执行前不可能预知的。因此，AI 必须在每一步后根据新信息重新决策。
+
+## 循环的四个阶段
+
+每次循环迭代包含四个阶段，形成一个完整的"感知→决策→执行→反馈"周期。
+
+### 阶段一：上下文预处理
+
+在调用 API 之前，系统会依次检查和处理上下文。这是一个串行管道，每一步的输出是下一步的输入：
 
 ```
-messagesForQuery（原始消息）
-  ↓ applyToolResultBudget()    — 工具结果预算截断（按 maxResultSizeChars）
-  ↓ snipCompactIfNeeded()      — 历史 Snip 压缩（HISTORY_SNIP feature）
-  ↓ microcompact()             — 微压缩（工具结果摘要）
-  ↓ applyCollapsesIfNeeded()   — 上下文折叠（CONTEXT_COLLAPSE feature）
-  ↓ autocompact()              — 自动压缩（超出阈值时触发）
-messagesForQuery（处理后的消息）→ 发往 API
+原始消息
+  → 工具结果截断（单条输出过长时截断）
+  → 历史压缩（Snip 压缩旧消息）
+  → 微压缩（工具结果摘要化）
+  → 自动压缩（对话接近 token 上限时触发 AI 摘要）
+处理后的消息 → 发往 API
 ```
 
-每个步骤的输出是下一步的输入，形成串行管道。Snip 和 Microcompact 的释放 token 数会传递给 autocompact 的阈值计算（`snipTokensFreed`），避免重复压缩。
+**设计考量**：为什么是串行管道而非一次性处理？因为每个步骤释放的 token 数会影响下一步的决策。例如，如果 Snip 压缩已经释放了足够的 token，自动压缩就不需要触发了。
 
-### 阶段 2：流式 API 调用（Streaming Loop）
+### 阶段二：流式 API 调用
 
-`deps.callModel()` 发起流式请求（`src/query.ts` 中 `attemptWithFallback` 循环内），返回一个 AsyncGenerator。在流式过程中：
+系统以流式方式调用 Claude API。流式传输不是"锦上添花"——它是核心设计决策：
 
-- **AssistantMessage** 被收集到 `assistantMessages[]` 数组
-- **tool_use 块** 被提取到 `toolUseBlocks[]`，设置 `needsFollowUp = true`
-- **StreamingToolExecutor** 在流式过程中就开始并行执行工具（不等流结束）
-- 可恢复的错误（prompt-too-long、max-output-tokens）被**暂扣**（withheld），先尝试恢复
+- **用户体验**：用户看到 AI 逐字输出，而非等待数秒后一次性显示
+- **工具并行执行**：AI 在流式输出过程中就可能发出工具调用，系统可以立即开始执行，不必等流结束
+- **可取消性**：用户随时可以中断正在进行的流式响应
 
-流式回调中的关键守卫：
-- `backfillObservableInput()` —— 为 tool_use 块回填可观察字段（如文件路径展开），但只在添加了新字段时才克隆消息，避免破坏 prompt cache 的字节一致性
-- 流式降级检测——如果 `streamingFallbackOccured`，已收集的消息被标记为 tombstone，清空后重试
+### 阶段三：工具执行
 
-### 阶段 3：工具执行（Tool Execution）
+如果 AI 请求了工具调用，系统执行工具并将结果回传。这里有两个关键设计：
 
-如果 `needsFollowUp` 为 true，循环不会终止，而是执行工具：
+**并行执行**：当 AI 在一次响应中请求多个独立工具调用时（如同时读两个文件），系统并行执行它们。这直接减少了用户等待时间。
 
-```typescript
-// 两种工具执行器（互斥）
-const toolUpdates = streamingToolExecutor
-  ? streamingToolExecutor.getRemainingResults()  // 流式：获取已完成的+等待中的
-  : runTools(toolUseBlocks, assistantMessages, canUseTool, toolUseContext)
-```
+**权限检查**：每个工具执行前都经过权限验证。危险操作（如执行 shell 命令）需要用户确认，安全操作（如读文件）可以自动放行。
 
-工具结果通过 `normalizeMessagesForAPI()` 标准化后，与原始消息合并，进入**下一轮循环迭代**。
+### 阶段四：终止或继续
 
-### 阶段 4：终止或继续
+每次迭代结束时，系统判断是否需要继续：
 
-每次迭代结束时，根据条件决定 `return`（终止）或 `continue`（继续）：
+| 条件 | 结果 |
+|------|------|
+| AI 请求了工具调用 | 继续（下一轮迭代） |
+| AI 只返回文本，没有工具调用 | 终止（任务完成） |
+| 用户中断 | 终止（用户取消） |
+| 达到最大 turn 数 | 终止（安全限制） |
+| Token 预算耗尽 | 终止（成本控制） |
 
-## 终止条件（源码级）
+## 错误恢复：自愈的状态机
 
-循环有多种终止路径，按触发时机排列：
+Agentic Loop 不是"正常路径走完就结束"的简单循环。它包含了多层错误恢复机制，使系统在各种异常情况下都能优雅处理。
 
-| 终止原因 | 触发位置 | 机制 |
-|----------|---------|------|
-| **blocking_limit** | 第 686 行 | Token 计数超过硬限制（非 autocompact 模式）→ 生成 PTL 错误消息 → 返回 |
-| **image_error** | 第 1021 行 | `ImageSizeError` / `ImageResizeError` 异常 → 直接返回 |
-| **model_error** | 第 1040 行 | `callModel()` 抛出不可恢复异常 → 生成错误消息 → 返回 |
-| **aborted_streaming** | 第 1095 行 | `abortController.signal.aborted`（流式阶段）→ 为未完成的 tool_use 生成合成 tool_result → 返回 |
-| **prompt_too_long** | 第 1219/1226 行 | 413 错误且 reactive compact 无法恢复 → 暂扣的错误消息被释放 → 返回 |
-| **completed** | 第 1308 行 | API 错误（限流、认证失败等）导致无法继续 → 返回 |
-| **stop_hook_prevented** | 第 1323 行 | Stop hook 返回 `preventContinuation: true` → 返回 |
-| **completed** | 第 1401 行 | 正常完成：AI 未发出 tool_use → `needsFollowUp = false` → 经过 stop hooks → 返回 |
-| **aborted_tools** | 第 1559 行 | `abortController.signal.aborted`（工具执行阶段）→ 返回 |
-| **hook_stopped** | 第 1564 行 | 工具执行期间 hook 返回 `shouldPreventContinuation` → 返回 |
-| **max_turns** | 第 1755 行 | 轮次计数超过 `maxTurns` 限制 → 返回 |
+### 输出截断恢复
 
-## 继续条件（恢复路径）
+当 AI 的响应被 token 上限截断时（AI 话说了一半被切断）：
 
-循环不仅是一个简单的"有 tool_use 就继续"，它还包含多种恢复/重试路径：
+1. **首次截断**：静默提升输出 token 上限，重试
+2. **仍然截断**：注入提示消息让 AI "接着说"，最多重试 3 次
+3. **恢复耗尽**：将截断的响应作为最终结果返回
 
-### 1. 正常工具循环（`next_turn`）
-`needsFollowUp = true` → 执行工具 → 新消息追加到 `messagesForQuery` → state 重新赋值 → `continue`
+### 上下文过长恢复
 
-### 2. max_output_tokens 恢复（`max_output_tokens_escalate` / `max_output_tokens_recovery`）
-当 AI 输出被截断时（`apiError === 'max_output_tokens'`），分两阶段恢复：
-- **提升阶段**（`max_output_tokens_escalate`）：首次截断时，将 `maxOutputTokens` 从默认值提升到 `ESCALATED_MAX_TOKENS`（64K）。静默重试，不注入 meta 消息。
-- **恢复阶段**（`max_output_tokens_recovery`）：提升后仍然截断时，注入恢复消息"Output token limit hit. Resume directly..."，最多重试 `MAX_OUTPUT_TOKENS_RECOVERY_LIMIT = 3` 次。恢复耗尽后，暂扣的错误消息被释放。
+当对话历史超过 API 的 token 限制时（413 错误）：
 
-### 3. Prompt-Too-Long 恢复（`collapse_drain_retry` / `reactive_compact_retry`）
-当遇到 413 错误时，按优先级尝试两种压缩策略：
-- **Context Collapse Drain**（`collapse_drain_retry`）：提交所有已暂存的折叠（collapse），释放空间后重试。如果上一轮已经是 `collapse_drain_retry` 则跳过，避免无限循环。
-- **Reactive Compact**（`reactive_compact_retry`）：如果 collapse drain 无法恢复，触发即时压缩（reactive compact），生成摘要后重试。`hasAttemptedReactiveCompact` 标志防止无限循环。
+1. **压缩重试**：即时压缩对话历史，生成摘要后重试
+2. **压缩后仍过长**：返回错误信息，让用户决定如何处理
 
-### 4. Stop Hook 阻塞重试（`stop_hook_blocking`）
-Stop hook 可以注入阻塞错误消息，强制 AI 重新思考。新的消息（包含阻塞错误）被追加到对话中，`stopHookActive = true`，进入下一轮迭代。
+关键设计：系统通过标志位防止无限循环——每种恢复路径只尝试一次，不会在"压缩→失败→压缩"之间死循环。
 
-### 5. Token Budget 继续提示（`token_budget_continuation`）
-当 `TOKEN_BUDGET` feature 启用时，如果 token 消耗达到阈值但未超出预算，注入 nudge 消息让 AI 加速收尾，然后继续。
+### 模型降级
 
-## 模型降级（Fallback）
+当主模型不可用时（过载、维护等）：
 
-当主模型不可用时（`FallbackTriggeredError`，`src/query.ts` 中 `attemptWithFallback` 循环的 catch 分支）：
+1. 已收集的响应被保留为历史记录
+2. 自动切换到备用模型
+3. 通知用户发生了降级
+4. 从中断点继续，而不是从头开始
 
-1. 已收集的 `assistantMessages` 被清空，tool_use 块收到合成 tool_result："Model fallback triggered"
-2. 思维签名块被移除（`stripSignatureBlocks`）—— 因为思维签名与模型绑定，跨模型回放会 400
-3. 切换到 `fallbackModel`，更新 `toolUseContext.options.mainLoopModel`
-4. 生成系统消息："Switched to {fallback} due to high demand for {original}"
-5. 重新发起流式请求
+## 状态管理
 
-## 状态机：State 对象
+每次迭代的状态是不可变更新的——系统创建新的状态对象而非就地修改。状态中包含：
 
-每次迭代的状态通过 `State` 类型（`src/query.ts`，类型定义）传递：
+- **对话消息**：当前所有消息的数组
+- **压缩跟踪**：压缩操作的累计状态
+- **恢复计数**：各种错误恢复已尝试的次数
+- **继续原因**：上一轮为什么继续（用于检测和避免循环）
 
-```typescript
-// src/query.ts — State 类型定义
-type State = {
-  messages: Message[]                        // 当前对话消息
-  toolUseContext: ToolUseContext              // 工具上下文（含权限）
-  autoCompactTracking: AutoCompactTrackingState | undefined  // 压缩跟踪
-  maxOutputTokensRecoveryCount: number       // 输出截断恢复计数
-  hasAttemptedReactiveCompact: boolean       // 是否已尝试即时压缩
-  maxOutputTokensOverride: number | undefined // 输出 token 上限覆盖
-  pendingToolUseSummary: Promise<...> | undefined  // 异步工具摘要
-  stopHookActive: boolean | undefined        // Stop hook 是否激活
-  turnCount: number                          // 轮次计数
-  transition: Continue | undefined           // 上一次继续的原因
-}
-```
-
-每次 `continue` 都创建新的 State 对象（不可变更新），而非就地修改。`transition` 字段记录了为什么继续——让后续迭代能检测特定恢复路径（如 `collapse_drain_retry`）避免循环。
-
-## Token Budget（实验性）
-
-当 `TOKEN_BUDGET` feature 启用时（`src/query.ts` 中 `!needsFollowUp` 分支内的预算检查逻辑），循环在终止前会检查 token 消耗：
-
-- **continuation**：未达到预算但超过阈值 → 注入 nudge 消息，让 AI 加速收尾
-- **diminishing_returns**：检测到收益递减 → 提前终止
-- 预算数据来自 `createBudgetTracker()`，跨迭代累计
+**设计考量**：状态中记录"继续原因"是一个关键的防循环机制。系统可以在后续迭代中检查"上一轮是因为压缩重试而继续的"，从而避免在同一个恢复路径上反复尝试。
 
 ## 为什么不是"一次规划，批量执行"
 
-<Note>
-源码揭示了为什么 Claude Code 选择逐步循环：
-</Note>
+一个自然的疑问是：为什么不先让 AI 规划好所有步骤，然后一次性批量执行？
 
-- **每一步都产生真实信息**：`runTools()` 返回的 `toolResults` 是 API 不可能预知的——命令输出、文件内容、错误信息
-- **动态上下文管理**：每轮迭代前都重新评估压缩需求（autocompact → microcompact → snip），基于最新的 token 计数
-- **错误即时恢复**：工具失败不需要推倒重来——stop hook 可以注入阻塞错误让 AI 修正策略
-- **用户可控**：`abortController.signal` 在循环的多个检查点被检测（第 1059、1095、1529 行），用户按 ESC 可以优雅中断
-- **成本控制**：Token Budget 在每轮终止前检查，防止 AI 无效循环
+答案在于软件工程的**不确定性**：
+
+- **每步结果影响下一步**：搜索结果决定了要改哪些文件，修改后的编译结果决定了是否需要进一步调整
+- **错误需要即时修正**：如果某步失败，AI 需要立即调整策略，而非继续执行无效计划
+- **用户可能中途干预**：循环架构允许用户随时打断和修正方向
+
+这不是说 AI 不做规划——事实上系统内置了规划模式（Plan Mode）用于复杂任务。但规划的结果仍然是逐步执行的，每一步都有机会根据新信息调整。
 
 ## 一个完整的迭代示例
 
 > 用户："帮我找到项目里所有未使用的导入语句，然后删掉它们"
 
 ```
-迭代 1: 思考→行动
-  预处理管道: applyToolResultBudget → snipCompact(HISTORY_SNIP feature) → microcompact → applyCollapses(CONTEXT_COLLAPSE feature) → autocompact
-    → 上下文很短，无需压缩
-  API 调用: 返回 tool_use(Glob, "**/*.ts")
-  工具执行: 返回 42 个文件路径
-  → needsFollowUp = true
-  → transition: { reason: 'next_turn' }, continue
+迭代 1: 探索
+  AI: 先找到所有 TypeScript 文件
+  工具: Glob("**/*.ts") → 返回 42 个文件
+  决策: 需要进一步分析 → 继续
 
-迭代 2: 思考→行动
-  预处理管道: 42 个文件结果仍在预算内
-  API 调用: 返回 tool_use(Grep, "import.*from")
-  工具执行: 在 15 个文件中找到 120 条 import
-  → needsFollowUp = true
-  → transition: { reason: 'next_turn' }, continue
+迭代 2: 分析
+  AI: 搜索这些文件中的 import 语句
+  工具: Grep("import.*from") → 在 15 个文件中找到 120 条 import
+  决策: 结果太多，需要进一步筛选 → 继续
 
-迭代 3: 思考→行动（多轮）
-  预处理管道: 120 条 Grep 结果触发 microcompact → 摘要化
-  API 调用: 返回 3 个 tool_use(FileEdit, ...)
-  工具执行: 删除 5 条未使用导入
-  → needsFollowUp = true
-  → transition: { reason: 'next_turn' }, continue
+迭代 3: 精确修改
+  AI: 分析哪些 import 未被使用，删除它们
+  上下文预处理: 120 条结果被微压缩为摘要
+  工具: FileEdit × 3 → 删除 5 条未使用导入
+  决策: 需要验证 → 继续
 
-迭代 4: 总结
-  API 调用: 返回纯文本"已清理 3 个文件中的 5 条未使用导入"
-  → needsFollowUp = false
-  → Stop hooks 通过
-  → Token Budget 检查通过（如果启用）
-  → return { reason: 'completed' }
+迭代 4: 验证与总结
+  AI: 验证修改后编译通过
+  工具: Bash("tsc --noEmit") → 编译通过
+  决策: 任务完成 → 终止
 ```
+
+注意这个过程中的关键特征：
+- AI 在每一步后根据结果自主决定下一步
+- 上下文在迭代过程中动态调整（微压缩被触发）
+- 用户全程无需介入
+
+## 接下来
+
+- **流式响应** — 理解流式传输的设计细节和用户体验考量
+- **多轮对话** — 跨迭代的上下文管理和会话持久化
+- **上下文压缩** — 深入理解自动压缩的触发条件和策略
+- **工具系统** — 了解 AI 可以调用哪些工具及其设计
