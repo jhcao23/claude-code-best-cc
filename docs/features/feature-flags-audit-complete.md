@@ -1004,10 +1004,11 @@ src/utils/swarm/ 目录（22 个文件）:
 | src/components/WorkflowMultiselectDialog.tsx | 127 行 | 工作流多选对话框（有内容） |
 | src/tasks/LocalWorkflowTask/LocalWorkflowTask.ts | 5 行 | 本地工作流任务（桩） |
 | src/components/tasks/WorkflowDetailDialog.tsx | 3 行 | 工作流详情对话框（桩） |
-| packages/builtin-tools/src/tools/WorkflowTool/WorkflowPermissionRequest.tsx | 3 行 | 工作流权限请求（桩） |
-| packages/builtin-tools/src/tools/WorkflowTool/createWorkflowCommand.ts | 3 行 | 创建工作流命令（桩） |
-| packages/builtin-tools/src/tools/WorkflowTool/WorkflowTool.ts | 1 行 | 工作流工具（桩） |
-| packages/builtin-tools/src/tools/WorkflowTool/constants.ts | 1 行 | 常量（桩） |
+| packages/builtin-tools/src/tools/WorkflowTool/WorkflowPermissionRequest.tsx | ~80 行 | 工作流权限请求组件 |
+| packages/builtin-tools/src/tools/WorkflowTool/createWorkflowCommand.ts | 41 行 | 创建工作流命令（已实现） |
+| packages/builtin-tools/src/tools/WorkflowTool/WorkflowTool.ts | 74 行 | 工作流工具（部分实现，call 需运行时） |
+| packages/builtin-tools/src/tools/WorkflowTool/constants.ts | ~10 行 | 常量定义 |
+| packages/builtin-tools/src/tools/WorkflowTool/bundled/index.ts | ~20 行 | 内置工作流初始化 |
 
 **引用该标志的文件（7 个）**:
 1. src/commands.ts — 命令注册（引用 `commands/workflows/index.js`）
