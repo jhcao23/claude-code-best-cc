@@ -1,203 +1,130 @@
 ---
-title: "多轮对话管理 - QueryEngine 会话编排与持久化"
-description: "从源码角度解析 Claude Code 多轮对话管理：QueryEngine 的会话状态机、JSONL transcript 持久化、成本追踪模型和模型热切换机制。"
+title: "多轮对话"
+description: "理解 Claude Code 的会话编排设计：为什么需要 QueryEngine？会话如何持久化？成本如何追踪？模型如何热切换？"
 keywords: ["多轮对话", "会话管理", "QueryEngine", "transcript", "成本追踪"]
-sourceRef: "3ec5675 (2026-04-08)"
 ---
 
-{/* 本章目标：从源码角度揭示会话编排、持久化存储、成本追踪和模型切换的完整链路 */}
+## 单轮 vs 多轮
 
-## 单轮 vs 多轮：架构层面的差异
+- **单轮**（一次 Agentic Loop）：用户说一句话，AI 可能执行多步工具调用后返回结果
+- **多轮**（一个会话）：用户和 AI 反复对话，持续数分钟到数小时
 
-- **单轮**（一次 Agentic Loop）：`query()` 函数的一次完整执行——组装上下文 → 调 API → 处理工具调用 → 循环直到结束
-- **多轮**（一个 Session）：`QueryEngine` 类管理的一次会话——跨越数十轮 `submitMessage()` 调用，持续数小时
+单轮关注"AI 如何自主完成任务"，多轮关注"如何管理一个持续演进的会话"——这是完全不同的工程问题。
 
-`QueryEngine`（`src/QueryEngine.ts`，类定义）是单轮 Agentic Loop 之上的**会话编排器**，它管理的状态远不止消息列表：
+## 为什么需要会话编排器
 
-```
-QueryEngine 内部状态（src/QueryEngine.ts 构造函数）
-├── mutableMessages: Message[]         ← 完整对话历史，跨 turn 累积
-├── readFileState: FileStateCache      ← 已读文件内容缓存，避免重复读取
-├── totalUsage: NonNullableUsage       ← 累计 token 消耗（input/output/cache）
-├── permissionDenials: SDKPermissionDenial[]  ← 权限拒绝记录
-├── discoveredSkillNames: Set<string>  ← 当前 turn 已发现的 skill
-├── loadedNestedMemoryPaths: Set<string>  ← 已加载的嵌套 memory 路径（防重复）
-├── hasHandledOrphanedPermission: boolean  ← 是否已处理孤立权限请求
-└── abortController: AbortController   ← 会话级中断控制
-```
+单轮的 Agentic Loop 已经很复杂了（错误恢复、上下文压缩、流式处理）。多轮在此基础上还需要管理：
 
-## QueryEngine 的核心方法：submitMessage()
+- **对话历史的累积**：消息不断增长，需要压缩策略
+- **成本的持续追踪**：跨轮次的 token 用量累计
+- **模型的热切换**：用户可能中途换模型
+- **会话的持久化与恢复**：意外中断后能继续
+- **文件的快照与回滚**：AI 改了文件，用户想撤回
 
-每次用户输入一条消息，REPL 或 SDK 调用 `submitMessage()`，它会执行完整的 turn 初始化链路：
+这些职责与"执行一次 agentic loop"无关，所以系统引入了 **QueryEngine** 作为会话编排器——它在 Agentic Loop 之上管理会话级别的状态。
 
-```typescript
-// src/QueryEngine.ts — QueryEngine.submitMessage() 简化流程
-async *submitMessage(
-  prompt: string | ContentBlockParam[],
-  options?: { uuid?: string; isMeta?: boolean },
-): AsyncGenerator<SDKMessage> {
-  // 1. 清除 turn 级追踪状态
-  this.discoveredSkillNames.clear()
+### 设计原则：编排器不参与循环
 
-  // 2. 解析模型（用户可能中途通过 setModel() 切换了模型）
-  const mainLoopModel = this.config.userSpecifiedModel
-    ? parseUserSpecifiedModel(this.config.userSpecifiedModel)
-    : getMainLoopModel()
+QueryEngine 只负责"准备好上下文，然后调用 agentic loop"。它不干预单轮循环的内部逻辑——循环中的错误恢复、工具执行、上下文压缩都是自治的。
 
-  // 3. 动态组装 System Prompt（每次 turn 都重新构建）
-  const { defaultSystemPrompt, userContext, systemContext } =
-    await fetchSystemPromptParts({ tools, mainLoopModel, mcpClients })
+这种分层使得 agentic loop 可以独立测试和优化，而不受会话状态管理的影响。
 
-  // 4. 包装权限检查（追踪每次拒绝）
-  const wrappedCanUseTool = async (tool, input, ...) => {
-    const result = await canUseTool(tool, input, ...)
-    if (result.behavior !== 'allow') {
-      this.permissionDenials.push({
-        type: 'permission_denial',
-        tool_name: sdkCompatToolName(tool.name),
-        tool_use_id: toolUseID,
-        tool_input: input,
-      })
-    }
-    return result
-  }
+## 会话持久化
 
-  // 5. 调用核心 query() 函数执行 agentic loop
-  yield* query({
-    systemPrompt, messages: this.mutableMessages,
-    tools, model: mainLoopModel, ...
-  })
-}
-```
+### 为什么持久化很重要
 
-关键设计：`submitMessage()` 是 `async *Generator`——它逐步 yield `SDKMessage`，让调用方（REPL/SDK）能实时展示进度，而不是等整个 turn 结束。
+终端会话是脆弱的——网络断开、进程崩溃、意外关闭都可能丢失对话。持久化确保用户的工作不丢失。
 
-## 会话持久化：JSONL Transcript
+### 设计选择：JSONL 追加写入
 
-每次对话事件都被追加写入 transcript 文件（`src/utils/sessionStorage.ts`）：
+对话事件以 JSONL（每行一条 JSON）格式追加写入磁盘。
 
-### 存储路径
+为什么选择 JSONL 而不是数据库或 JSON 文件？
+
+| 方案 | 优势 | 劣势 |
+|------|------|------|
+| **JSONL 追加写入** | 写入快速、不需要读-改-写、崩溃安全 | 查询需要扫描整个文件 |
+| JSON 文件 | 结构清晰 | 每次写入需要读取整个文件、修改、写回——大文件很慢 |
+| SQLite 数据库 | 查询高效 | 引入额外依赖、事务管理复杂 |
+
+追加写入是关键设计：每次新消息只需要在文件末尾追加一行，不需要读取和修改已有内容。即使写入过程中崩溃，也只会丢失最后一条记录，不会损坏整个文件。
+
+### 存储结构
 
 ```
-~/.claude/projects/<sanitized-cwd>/<session-uuid>.jsonl
+~/.claude/projects/<项目目录>/
+  ├── <session-1>.jsonl
+  ├── <session-2>.jsonl
+  └── ...
 ```
 
-- 路径由 `getProjectDir(originalCwd)` 生成，使用 `sanitizePath()` 将项目目录路径转换为安全的目录名（非 hash），同一项目目录的会话归入同一子目录
-- 每条记录是一行 JSON（JSONL 格式），支持追加写入而不需要读取-修改-写入整个文件
-- 读取上限为 50MB（`MAX_TRANSCRIPT_READ_BYTES` 常量，`src/utils/sessionStorage.ts`），防止超大会话导致 OOM
+每个项目的会话归入同一目录。同一项目的对话可以跨会话积累上下文。
 
-### Transcript 写入器
+### 大小防护
 
-`Project` 类（`src/utils/sessionStorage.ts`，私有类）管理 transcript 的写入。它通过 `writeQueues`（按文件分组的写队列）和 `drainWriteQueue()`（定时批量刷写）确保并发消息追加不会互相覆盖：
+读取上限为 50MB。超过这个大小的会话文件不会被完整加载——这是防止超大会话导致内存溢出的安全措施。
 
-```
-写入流程（异步排队路径）：
-  recordTranscript(sessionId, entry)
-    ↓
-  project.enqueueWrite(filePath, entry)    ← 入列到 writeQueues
-    ↓
-  scheduleDrain()                          ← 设置定时器（FLUSH_INTERVAL_MS）
-    ↓
-  drainWriteQueue()                        ← 按 MAX_CHUNK_BYTES 分批
-    ↓  写入每批
-  appendToFile(path, batchContent)         ← 批量追加
-    ↓
-  如果配置了远程持久化：
-    persistToRemote(sessionId, entry)
-      ├── CCR v2: internalEventWriter('transcript', entry)
-      └── v1 Ingress: sessionIngress.appendSessionLog(...)
+### 会话恢复
 
-同步直写路径（用于元数据重写等场景）：
-  appendEntryToFile(fullPath, entry)       ← 同步 appendFileSync
-    ↓
-  失败时 mkdir + 重试
-```
+当用户使用 `--resume` 恢复会话时，系统：
 
-### 会话恢复链路
+1. 从 JSONL 文件重建消息数组
+2. 恢复累计费用状态
+3. 恢复用户选择的模型和配置
+4. 从中断点继续对话
 
-`--resume` 参数触发的恢复流程（`src/main.tsx` 中 `--resume` 分支）：
+整个过程对用户是透明的——恢复后的对话就像从来没有中断过。
 
-```
-1. 解析 resume 参数：
-   ├── UUID 格式 → getTranscriptPathForSession(uuid)
-   ├── .jsonl 文件路径 → 直接使用
-   └── boolean → 最近一次会话的 picker
-   
-2. loadTranscriptFromFile(path)
-   ├── 按 JSONL 行解析
-   ├── 过滤出消息类型记录
-   └── 重建 Message[] 数组
+## 成本追踪
 
-3. 恢复上下文状态：
-   ├── restoreCostStateForSession(sessionId)  ← 恢复累计费用
-   ├── 恢复 agentSetting（用户选择的 Agent 类型）
-   └── 如果有 --rewind-files，恢复文件到指定消息时的快照
+### 为什么需要成本追踪
 
-4. 创建 QueryEngine({ initialMessages: restoredMessages })
-   └── 从恢复的消息继续对话
-```
+AI API 按 token 计费，一次复杂任务可能消耗大量 token。没有成本追踪，用户无法判断"这次对话花了多少钱"，也无法在费用过高时及时终止。
 
-## 成本追踪：从 API Usage 到美元
+### 三层追踪架构
 
-成本追踪贯穿三个模块，形成完整的记录→累计→展示链路：
+| 层 | 职责 | 持久性 |
+|----|------|--------|
+| **记录层** | 从每个 API 响应中提取 token 用量 | 实时 |
+| **累计层** | 按模型汇总累计费用（切换模型时分别统计） | 会话内 |
+| **持久化层** | 会话结束时保存到项目配置 | 跨重启 |
 
-### 记录层：API 响应中的 Usage
+### 预算提醒
 
-每个 `message_delta` 事件携带 `usage` 字段（`input_tokens`、`output_tokens`、`cache_creation_input_tokens`、`cache_read_input_tokens`）。`accumulateUsage()` 将增量 usage 累加到会话总量。
-
-### 累计层：cost-tracker.ts
-
-```typescript
-// src/cost-tracker.ts — StoredCostState 类型定义
-type StoredCostState = {
-  totalCostUSD: number                       // 累计美元花费
-  totalAPIDuration: number                   // API 调用总时长（含重试）
-  totalAPIDurationWithoutRetries: number     // 不含重试的纯推理时间
-  totalToolDuration: number                  // 工具执行总时长
-  totalLinesAdded: number                    // 代码增加行数
-  totalLinesRemoved: number                  // 代码删除行数
-  lastDuration: number | undefined           // 最近一次会话时长
-  modelUsage: { [modelName: string]: ModelUsage } | undefined  // 按模型分拆的用量
-}
-```
-
-`addToTotalSessionCost()` 根据模型定价计算每次 API 调用的费用，累计到 `totalCostUSD`。按模型的 `ModelUsage` 支持在同一会话中切换模型后分别统计。
-
-### 持久化：跨重启保留
-
-```typescript
-// 每次会话结束时保存到项目配置
-saveCurrentSessionCosts(sessionId)
-  → projectConfig.lastCost = totalCostUSD
-  → projectConfig.lastSessionId = sessionId
-  → projectConfig.lastModelUsage = modelUsage
-```
-
-### 预算熔断
-
-`QueryEngineConfig.maxBudgetUsd` 提供了会话级的硬性预算上限。在 REPL 中，当累计费用超过 $5 时（`src/screens/REPL.tsx` 中费用阈值 `useEffect`），弹出费用提醒对话框——这不是硬性阻断，而是"软提醒"，且仅在 `hasConsoleBillingAccess()` 为 true 时显示。
+系统提供会话级的预算上限。当累计费用超过阈值时弹出提醒——这不是硬性阻断，而是"软提醒"。设计上选择了提醒而非强制终止，因为用户可能正在进行关键操作（如修复生产 bug），强制终止可能造成更大损失。
 
 ## 模型热切换
 
-在一个会话中切换模型不会丢失对话历史——因为 `mutableMessages` 与模型选择是解耦的：
+### 设计挑战
 
-```
-/model sonnet → QueryEngine.setModel('claude-sonnet-4-20250514')
-  ↓  实际操作：this.config.userSpecifiedModel = model（QueryEngine.setModel() 方法）
-下一次 submitMessage() 开始时：
-  ↓
-parseUserSpecifiedModel(this.config.userSpecifiedModel)
-  → 返回新的模型配置
-  ↓
-fetchSystemPromptParts({ mainLoopModel: newModel })
-  → System Prompt 根据新模型能力重新组装
-  ↓
-query({ model: newModel, messages: this.mutableMessages })
-  → 使用完整历史 + 新模型继续对话
-```
+在一个持续对话中切换模型看似简单，实际上需要解决几个问题：
 
-切换模型时，`contextWindowTokens` 和 `maxOutputTokens` 也会根据新模型的规格重新计算——例如从 Sonnet 切换到 Opus 时，上下文窗口可能从 200K 变为 1M。
+1. **上下文窗口不同**：Sonnet 的 200K 和 Opus 的 1M 需要不同的压缩策略
+2. **对话历史兼容**：旧模型生成的内容新模型需要能理解
+3. **费用计算**：不同模型定价不同，需要分别统计
+
+### 设计决策：消息与模型解耦
+
+对话历史（消息数组）和模型选择是独立的。切换模型只改变"下一次 API 调用用什么模型"，不修改已有消息。系统会在下次调用前根据新模型的规格重新计算上下文窗口和输出限制。
+
+这意味着用户可以在对话中随时切换模型——例如用便宜的 Sonnet 做简单操作，遇到复杂问题时切换到 Opus——而不需要开始新的会话。
 
 ## 文件快照与回滚
 
-`fileHistoryMakeSnapshot()`（`src/utils/fileHistory.ts`）在 AI 每次修改文件前自动保存当前内容。快照绑定到具体的 `message.id`，使得 `--rewind-files <user-message-id>` 可以精确恢复到对话中任意时间点的文件状态——这比 git 更细粒度（git 只追踪已提交的内容）。
+### 比 git 更细粒度的追踪
+
+AI 每次修改文件前，系统自动保存当前文件内容的快照。快照绑定到具体的消息 ID，使得用户可以精确恢复到对话中任意时间点的文件状态。
+
+这比 `git checkout` 更细粒度——git 只追踪已提交的内容，而文件快照追踪的是 AI 每一次修改前的状态。
+
+### 使用场景
+
+- AI 改了代码但用户不满意 → 回滚到修改前的状态
+- AI 进行了多轮修改 → 选择性回滚到某个中间状态
+- 用户关闭终端后想撤销 → 通过会话恢复 + 文件回滚实现
+
+## 接下来
+
+- **系统提示词** — 理解每轮对话前的上下文组装策略
+- **上下文压缩** — 深入了解对话过长时的自动压缩机制
+- **令牌预算** — 理解 token 预算管理和成本控制
