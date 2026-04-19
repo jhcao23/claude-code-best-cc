@@ -1,4 +1,14 @@
-import type { ChannelPermissionRequestParams } from '../mcp/channelNotification.js'
+/** Mirrors ChannelPermissionRequestParams from src/services/mcp/channelNotification.ts */
+export interface ChannelPermissionRequestParams {
+  request_id: string
+  tool_name: string
+  description: string
+  input_preview: string
+  channel_context?: {
+    source_server?: string
+    chat_id?: string
+  }
+}
 
 export type PendingPermissionRequest = ChannelPermissionRequestParams & {
   chatId: string

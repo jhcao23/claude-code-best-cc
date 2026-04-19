@@ -142,8 +142,9 @@ async function main(): Promise<void> {
 
   if (args[0] === 'weixin') {
     profileCheckpoint('cli_weixin_path')
-    const { handleWeixinCli } = await import('../services/weixin/cli.js')
-    await handleWeixinCli(args.slice(1))
+    const { handleWeixinCli } = await import('@claude-code-best/weixin')
+    const { runWeixinMcpServer } = await import('../services/weixin/cli-serve.js')
+    await handleWeixinCli(args.slice(1), runWeixinMcpServer)
     return
   }
 

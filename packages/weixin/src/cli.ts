@@ -1,7 +1,6 @@
 import { clearAccount, DEFAULT_BASE_URL, loadAccount, saveAccount } from './accounts.js'
 import { startLogin, waitForLogin } from './login.js'
 import { confirmPairing } from './pairing.js'
-import { runWeixinMcpServer } from './server.js'
 
 function printUsage(): void {
   process.stdout.write(
@@ -91,12 +90,20 @@ function runAccess(args: string[]): void {
   process.stdout.write(`Paired successfully: ${userId}\n`)
 }
 
-export async function handleWeixinCli(args: string[]): Promise<void> {
+export async function handleWeixinCli(
+  args: string[],
+  serveHandler?: () => Promise<void>,
+): Promise<void> {
   const [subcommand, ...rest] = args
 
   switch (subcommand) {
     case 'serve':
-      await runWeixinMcpServer()
+      if (serveHandler) {
+        await serveHandler()
+      } else {
+        process.stderr.write('[weixin] serve handler not available in this context.\n')
+        process.exit(1)
+      }
       return
     case 'login':
       await runLogin(rest[0] === 'clear')

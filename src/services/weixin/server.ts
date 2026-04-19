@@ -14,12 +14,21 @@ import { shutdownDatadog } from '../analytics/datadog.js'
 import { shutdown1PEventLogging } from '../analytics/firstPartyEventLogger.js'
 import { enableConfigs } from '../../utils/config.js'
 import { logForDebugging } from '../../utils/debug.js'
-import { CDN_BASE_URL, DEFAULT_BASE_URL, loadAccount } from './accounts.js'
-import { getConfig, sendTyping } from './api.js'
-import { getContextToken, startPollLoop, type ParsedMessage } from './monitor.js'
-import { getActivePermissionChat, savePendingPermission } from './permissions.js'
-import { sendMediaFile, sendText } from './send.js'
-import { TypingStatus } from './types.js'
+import {
+  CDN_BASE_URL,
+  DEFAULT_BASE_URL,
+  loadAccount,
+  getConfig,
+  sendTyping,
+  getContextToken,
+  startPollLoop,
+  getActivePermissionChat,
+  savePendingPermission,
+  sendMediaFile,
+  sendText,
+  TypingStatus,
+} from '@claude-code-best/weixin'
+import type { ParsedMessage } from '@claude-code-best/weixin'
 
 function formatPermissionRequestMessage(
   request: ChannelPermissionRequestParams,

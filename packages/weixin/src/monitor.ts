@@ -6,7 +6,8 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
-import { PERMISSION_REPLY_RE } from '../mcp/channelPermissions.js'
+// Matches the canonical definition in src/services/mcp/channelPermissions.ts
+const PERMISSION_REPLY_RE = /^\s*(y|yes|n|no)\s+([a-km-z]{5})\s*$/i
 import { getUpdates } from './api.js'
 import { getStateDir } from './accounts.js'
 import { downloadAndDecrypt } from './media.js'
