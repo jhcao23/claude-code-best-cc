@@ -20,7 +20,7 @@ keywords: ["沙箱", "sandbox", "权限", "Bash", "PowerShell", "bubblewrap", "s
 - 这一层仓库自己负责：策略、配置转换、启停判断、命令包裹、清理和权限联动
 - 真正做 OS 级隔离的是外部运行时 `@anthropic-ai/sandbox-runtime`
 
-在 `src/utils/sandbox/sandbox-adapter.ts` 里，可以很清楚地看到这条边界：项目导入 `SandboxManager as BaseSandboxManager`、`SandboxViolationStore` 等运行时对象，然后在外面再包一层符合 Claude Code 自身权限模型的适配器。
+适配层负责导入底层运行时对象（`SandboxManager`、`SandboxViolationStore` 等），然后在它们外面再包一层符合 Claude Code 自身权限模型的接口。
 
 底层隔离在不同平台上的落地也不是同一套实现：
 
@@ -64,7 +64,7 @@ keywords: ["沙箱", "sandbox", "权限", "Bash", "PowerShell", "bubblewrap", "s
 
 ### 1. 给 shell 一个 OS 级兜底
 
-`src/utils/bash/ast.ts` 开头就写得很明确：Bash AST 分析不是沙箱，它只是在判断我们能不能可靠地理解命令结构，不能阻止危险命令真的运行。
+Bash AST 分析明确声明自己不是沙箱——它只判断"能不能可靠地理解命令结构"，不能阻止危险命令真正运行。
 
 这就是为什么应用层再聪明，也很难仅靠“执行前推断”覆盖完整风险面。像下面这些命令，真实副作用都要到运行时才完全展开：
 
@@ -106,7 +106,7 @@ keywords: ["沙箱", "sandbox", "权限", "Bash", "PowerShell", "bubblewrap", "s
 
 ### 4. 拦截运行时绕过和逃逸路径
 
-这个仓库在 `src/utils/sandbox/sandbox-adapter.ts` 里专门把一些高风险路径额外加入 `denyWrite`，例如：
+适配层专门把一些高风险路径额外加入 `denyWrite`，例如：
 
 - `settings.json`
 - `.claude/skills`
@@ -138,7 +138,7 @@ keywords: ["沙箱", "sandbox", "权限", "Bash", "PowerShell", "bubblewrap", "s
 - 纯应用层的权限弹窗和规则匹配
 - Bash AST 解析本身
 
-尤其要注意一点：Bash AST 分析不是沙箱。源码自己写得很明确，它只回答“我们能不能可信地提取 argv 结构”，并不负责阻止危险命令真正运行。
+尤其要注意一点：Bash AST 分析不是沙箱。它只回答”我们能不能可信地提取 argv 结构”，并不负责阻止危险命令真正运行。
 
 ## 哪些场景会走沙箱
 
@@ -166,7 +166,7 @@ keywords: ["沙箱", "sandbox", "权限", "Bash", "PowerShell", "bubblewrap", "s
 5. 这条命令没有被显式排除
 6. 这次调用没有被允许以 `dangerouslyDisableSandbox` 绕过
 
-对应入口在 `packages/builtin-tools/src/tools/BashTool/shouldUseSandbox.ts` 和 `src/utils/sandbox/sandbox-adapter.ts`。
+对应入口在 `shouldUseSandbox()` 和沙箱适配层中。
 
 ### 3. PowerShell 只在支持平台上走
 
@@ -513,20 +513,6 @@ REPL / CLI 启动
 - 对不走 shell 的工具同样生效
 
 而沙箱负责的是最终兜底。
-
-## 推荐的阅读路径
-
-如果你想继续顺着源码深入，推荐按下面顺序看：
-
-1. `packages/builtin-tools/src/tools/BashTool/shouldUseSandbox.ts`
-2. `src/utils/Shell.ts`
-3. `src/utils/sandbox/sandbox-adapter.ts`
-4. `src/utils/permissions/permissions.ts`
-5. `packages/builtin-tools/src/tools/BashTool/bashPermissions.ts`
-6. `src/utils/permissions/pathValidation.ts`
-7. `src/utils/permissions/filesystem.ts`
-
-按这条线读，会更容易把“权限系统”和“沙箱系统”在脑中拆开。
 
 ## FAQ
 
