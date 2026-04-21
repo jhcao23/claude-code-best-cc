@@ -18,7 +18,7 @@ import { calculateStats, getCreatureName, getTotalEV, getActiveCreature } from '
 import { getXpProgress } from '@claude-code-best/pokemon';
 import { getEVSummary } from '@claude-code-best/pokemon';
 import { getGenderSymbol } from '@claude-code-best/pokemon';
-import { StatBar } from '@claude-code-best/pokemon';
+import { StatBar, SpriteAnimator, getFallbackSprite } from '@claude-code-best/pokemon';
 import type { LocalJSXCommandContext, LocalJSXCommandOnDone } from '../../types/command.js';
 
 const CYAN: Color = 'ansi:cyan';
@@ -151,10 +151,12 @@ function BuddyTab({
       </Box>
 
       {spriteLines && (
-        <Box flexDirection="column" alignItems="center" marginY={0}>
-          {spriteLines.map((line, i) => (
-            <Text key={i}>{line}</Text>
-          ))}
+        <Box marginY={0}>
+          <SpriteAnimator
+            lines={spriteLines}
+            color={creature.isShiny ? YELLOW : CYAN}
+            tickMs={500}
+          />
         </Box>
       )}
 

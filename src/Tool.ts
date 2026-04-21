@@ -112,6 +112,9 @@ export type SetToolJSXFn = (
     isImmediate?: boolean
     /** Set to true to clear a local JSX command (e.g., from its onDone callback) */
     clearLocalJSX?: boolean
+    /** Called when the panel is dismissed externally (e.g. ESC via CancelRequestHandler).
+     * Must resolve the underlying Promise in processSlashCommand.tsx. */
+    onDismiss?: () => void
   } | null,
 ) => void
 

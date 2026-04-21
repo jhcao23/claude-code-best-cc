@@ -839,6 +839,13 @@ async function getMessagesForSlashCommand(
                 showSpinner: false,
                 isLocalJSXCommand: true,
                 isImmediate: command.immediate === true,
+                // When the panel is dismissed externally (ESC via CancelRequestHandler),
+                // resolve the Promise so executeUserInput doesn't hang forever.
+                onDismiss: () => {
+                  if (doneWasCalled) return
+                  doneWasCalled = true
+                  void resolve({ messages: [], shouldQuery: false, command })
+                },
               })
             })
             .catch(e => {

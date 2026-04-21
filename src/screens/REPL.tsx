@@ -1288,6 +1288,9 @@ export function REPL({
     shouldContinueAnimation?: true;
     showSpinner?: boolean;
     isLocalJSXCommand: true;
+    /** Called when the panel is dismissed externally (ESC via CancelRequestHandler).
+     * Resolves the underlying Promise in processSlashCommand.tsx. */
+    onDismiss?: () => void;
   } | null>(null);
 
   // Wrapper for setToolJSX that preserves local JSX commands (like /btw).
@@ -1308,6 +1311,7 @@ export function REPL({
         showSpinner?: boolean;
         isLocalJSXCommand?: boolean;
         clearLocalJSX?: boolean;
+        onDismiss?: () => void;
       } | null,
     ) => {
       // If setting a local JSX command, store it in the ref
@@ -1322,6 +1326,9 @@ export function REPL({
       if (localJSXCommandRef.current) {
         // Allow clearing only if explicitly requested (from onDone callbacks)
         if (args?.clearLocalJSX) {
+          // Notify the command that its panel was dismissed externally (e.g. ESC)
+          // so it can resolve the underlying Promise and unblock executeUserInput.
+          localJSXCommandRef.current.onDismiss?.();
           localJSXCommandRef.current = null;
           setToolJSXInternal(null);
           return;

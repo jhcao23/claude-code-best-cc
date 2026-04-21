@@ -313,6 +313,15 @@ export async function handlePromptSubmit(
           shouldHidePromptInput: false,
           isLocalJSXCommand: true,
           isImmediate: true,
+          onDismiss: () => {
+            if (doneWasCalled) return
+            doneWasCalled = true
+            setToolJSX({
+              jsx: null,
+              shouldHidePromptInput: false,
+              clearLocalJSX: true,
+            })
+          },
         })
       }
       return

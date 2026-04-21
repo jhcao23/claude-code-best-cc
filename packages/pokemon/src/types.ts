@@ -140,4 +140,14 @@ export type SpriteCache = {
 }
 
 // Animation mode
-export type AnimMode = 'idle' | 'fidget' | 'blink' | 'excited' | 'pet'
+export type AnimMode =
+	| 'idle'
+	| 'breathe'
+	| 'blink'
+	| 'fidget'
+	| 'bounce'
+	| 'walkLeft'
+	| 'walkRight'
+	| 'flip'
+	| 'excited'
+	| 'pet'
