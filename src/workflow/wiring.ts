@@ -9,7 +9,7 @@ import { buildTool, type Tool } from '../Tool.js'
  * 把包的自包含描述符适配为 buildTool 兼容的 Tool。
  * 描述符的 call 签名 (input, context, canUseTool, parentMessage, onProgress) 与 Tool.call 一致。
  */
-export function createWorkflowToolCore(): Tool {
+function buildWorkflowTool(): Tool {
   const adapter = createWorkflowAdapter()
   const descriptor: WorkflowToolDescriptor = createWorkflowTool(adapter)
 
@@ -40,4 +40,13 @@ export function createWorkflowToolCore(): Tool {
     mapToolResultToToolResultBlockParam: (data, toolUseId) =>
       descriptor.mapToolResultToToolResultBlockParam(data, toolUseId),
   })
+}
+
+// 单例：tools.ts 注册与 PermissionRequest 引用需为同一实例（switch 按引用匹配），
+// 且共享同一个 adapter（bindings 映射）。
+let cached: Tool | null = null
+
+export function createWorkflowToolCore(): Tool {
+  if (!cached) cached = buildWorkflowTool()
+  return cached
 }
