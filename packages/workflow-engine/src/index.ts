@@ -15,3 +15,9 @@ export * from './engine/context.js'
 export * from './engine/hooks.js'
 export * from './engine/runWorkflow.js'
 export * from './progress/events.js'
+export {
+  createWorkflowTool,
+  type WorkflowToolDescriptor,
+} from './tool/WorkflowTool.js'
+export { workflowInputSchema } from './tool/schema.js'
+export { WORKFLOW_TOOL_NAME } from './tool/constants.js'
